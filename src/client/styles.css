@@ -11,6 +11,9 @@
   --ai-deep: #223b54;
   --wakatake: #4f7f5a; /* 若竹：済み・成功 */
   --danger: #a93b32;
+  --shu: #b8432f; /* 朱：遅れの判子 */
+  --shu-tint: #f8e9e4;
+  --wakatake-tint: #e7f0e8;
   --focus: #e0a526;
 
   --font: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "BIZ UDPGothic", system-ui, sans-serif;
@@ -101,23 +104,45 @@ p {
   z-index: 1;
 }
 
-.topnav {
+/* タブ：PC ではヘッダーの右、スマホでは画面の下に固定 */
+.tabs {
   display: flex;
   gap: 0.25rem;
 }
-.topnav button {
+.tabs button {
   font: inherit;
   font-size: var(--t-small);
+  font-weight: 500;
   background: none;
   border: 0;
   color: var(--ink-soft);
-  padding: 0.375rem 0.75rem;
+  padding: 0.375rem 0.875rem;
   border-radius: 999px;
   cursor: pointer;
 }
-.topnav button.is-current {
-  color: var(--surface);
+.tabs button.is-current {
+  color: #fff;
   background: var(--ai);
+}
+@media (max-width: 40rem) {
+  .tabs {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 2;
+    justify-content: space-around;
+    gap: 0;
+    padding: 0.375rem 0.5rem calc(0.375rem + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+  .tabs button {
+    flex: 1;
+    min-height: 2.75rem;
+    font-size: var(--t-body);
+  }
+  .shell .page {
+    padding-bottom: 6rem;
+  }
 }
 
 /* ---- ワードマーク：この画面でいちばん目立たせるもの ---- */
@@ -460,4 +485,439 @@ select {
 .segmented button[aria-selected="true"] {
   background: var(--ai);
   color: #fff;
+}
+
+
+/* ---- 今日：当番表 ---- */
+
+.today__head {
+  margin-bottom: 1.5rem;
+}
+.today__family {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--t-small);
+}
+.today__date {
+  font-size: 1.75rem;
+  margin: 0;
+}
+.today__section {
+  font-size: var(--t-body);
+  color: var(--ink-soft);
+  margin: 1.75rem 0 0.75rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.count {
+  font-size: var(--t-small);
+  color: #fff;
+  background: var(--ink);
+  border-radius: 999px;
+  padding: 0 0.5rem;
+  line-height: 1.5;
+}
+.all-clear {
+  padding: 1rem 0;
+  font-weight: 500;
+  color: var(--wakatake);
+}
+.empty {
+  padding: 1.5rem 0;
+}
+
+/* 当番札：左に紐の穴、黒い縁。遅れは朱、済みは若竹 */
+.fuda-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.fuda-wrap {
+  perspective: 900px;
+}
+.fuda-inner {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.is-done .fuda-inner {
+  transform: rotateY(180deg);
+}
+.fuda {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "body hanko"
+    "done done";
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 1rem 1rem 1rem 2.5rem;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 0.375rem;
+  backface-visibility: hidden;
+}
+.fuda::before {
+  /* 紐を通す穴 */
+  content: "";
+  position: absolute;
+  left: 0.875rem;
+  top: 1.375rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--ground);
+}
+.fuda--overdue {
+  border-color: var(--shu);
+  background: var(--shu-tint);
+}
+.fuda--overdue::before {
+  border-color: var(--shu);
+}
+.fuda--back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+  border-color: var(--wakatake);
+  background: var(--wakatake-tint);
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "hanko body undo";
+}
+.fuda--back::before {
+  border-color: var(--wakatake);
+}
+.fuda__body {
+  grid-area: body;
+  min-width: 0;
+}
+.fuda__name {
+  font-size: 1.1875rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.4;
+}
+.fuda__name a {
+  color: inherit;
+  text-decoration: none;
+}
+.fuda__name a:hover {
+  text-decoration: underline;
+}
+.fuda__meta {
+  margin: 0.125rem 0 0;
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+}
+.fuda .hanko {
+  grid-area: hanko;
+}
+.fuda__done {
+  grid-area: done;
+  min-height: 3rem;
+  font-size: 1.0625rem;
+}
+.fuda__undo {
+  grid-area: undo;
+}
+
+/* 判子：朱の丸に「3日 遅れ」。少し傾けて押したように */
+.hanko {
+  display: inline-grid;
+  place-content: center;
+  text-align: center;
+  width: 3.75rem;
+  height: 3.75rem;
+  border-radius: 50%;
+  border: 2.5px solid currentColor;
+  line-height: 1.15;
+  transform: rotate(-9deg);
+  flex: none;
+}
+.hanko b {
+  font-size: 1.0625rem;
+  font-weight: 900;
+}
+.hanko span {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.hanko--late {
+  color: var(--shu);
+  box-shadow: inset 0 0 0 2px var(--shu-tint), inset 0 0 0 3px currentColor;
+}
+.hanko--today {
+  color: var(--ai);
+}
+.hanko--done {
+  color: var(--wakatake);
+  width: 3rem;
+  height: 3rem;
+}
+.hanko--done b {
+  font-size: 1.375rem;
+}
+.due-soon {
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.rows .list__title a {
+  color: inherit;
+  text-decoration: none;
+}
+.rows__due {
+  margin: 0;
+  text-align: right;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.rows__left {
+  display: block;
+  font-weight: 500;
+}
+.rows__date {
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 裏返さずに切り替える */
+  .fuda-inner {
+    transition: none;
+  }
+  .is-done .fuda-inner {
+    transform: none;
+  }
+  .is-done .fuda:not(.fuda--back) {
+    visibility: hidden;
+  }
+  .fuda--back {
+    transform: none;
+  }
+}
+
+/* ---- 家事の一覧 ---- */
+
+.page--wide {
+  max-width: 64rem;
+}
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.page-head h1 {
+  margin: 0;
+}
+.chore-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+.chore-table th,
+.chore-table td {
+  text-align: left;
+  padding: 0.625rem 0.75rem 0.625rem 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.chore-table thead th {
+  font-size: var(--t-small);
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.chore-table tbody th a {
+  color: var(--ink);
+  font-weight: 700;
+}
+.chore-table .is-archived {
+  color: var(--ink-soft);
+}
+.due-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.due-cell .hanko {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+.due-cell .hanko b {
+  font-size: 0.8125rem;
+}
+.due-cell .hanko span {
+  font-size: 0.625rem;
+}
+@media (max-width: 40rem) {
+  /* スマホでは表を行に崩す */
+  .chore-table thead {
+    display: none;
+  }
+  .chore-table tr {
+    display: block;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .chore-table th,
+  .chore-table td {
+    display: block;
+    border: 0;
+    padding: 0.125rem 0;
+  }
+  .chore-table td::before {
+    content: attr(data-label) "　";
+    color: var(--ink-soft);
+    font-size: var(--t-small);
+  }
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--t-small);
+}
+.check input,
+.radio input,
+.weekday input {
+  width: auto;
+  min-height: 0;
+}
+
+/* ---- 家事の登録 ---- */
+
+.chore-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.field--short {
+  max-width: 16rem;
+}
+.fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+.fieldset legend {
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+  margin-bottom: 0.375rem;
+}
+.radio {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.625rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  cursor: pointer;
+}
+.radio .muted {
+  grid-column: 2;
+}
+.calendar-rule {
+  padding-left: 1rem;
+  border-left: 3px solid var(--line);
+  margin-bottom: 0.5rem;
+}
+.weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+.weekday {
+  position: relative;
+}
+.weekday input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+}
+.weekday span {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1.5px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  font-weight: 500;
+  cursor: pointer;
+}
+.weekday input:checked + span {
+  background: var(--ai);
+  border-color: var(--ai);
+  color: #fff;
+}
+.weekday input:focus-visible + span {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.preview {
+  margin: 0.5rem 0 1.25rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--surface);
+  border-left: 4px solid var(--ai);
+}
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* ---- 家事の詳細 ---- */
+
+.crumb {
+  margin: 0 0 0.25rem;
+  font-size: var(--t-small);
+}
+.crumb a {
+  color: var(--ink-soft);
+}
+.detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.detail-head h1 {
+  margin-bottom: 0.25rem;
+}
+.detail-sub {
+  color: var(--ink-soft);
+  font-size: var(--t-small);
+}
+.next-due {
+  font-size: var(--t-h2);
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 1rem 1.5rem;
+  margin: 0;
+}
+.facts dt {
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+}
+.facts dd {
+  margin: 0;
+  font-size: var(--t-h2);
+  font-weight: 700;
+}
+.facts__note {
+  display: block;
+  font-size: var(--t-small);
+  font-weight: 400;
+  color: var(--ink-soft);
 }

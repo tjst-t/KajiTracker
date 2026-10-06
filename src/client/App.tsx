@@ -4,18 +4,25 @@ import { takeFragmentFromUrl } from "./auth";
 import { errorText } from "./format";
 import { FamilyCreate } from "./screens/FamilyCreate";
 import { FamilyScreen } from "./screens/FamilyScreen";
-import { Home } from "./screens/Home";
 import { InviteScreen } from "./screens/Invite";
 import { Login } from "./screens/Login";
 import { Settings } from "./screens/Settings";
+import { ChoreDetail } from "./screens/ChoreDetail";
+import { ChoreForm } from "./screens/ChoreForm";
+import { Chores } from "./screens/Chores";
 import { TicketScreen } from "./screens/Ticket";
+import { Today } from "./screens/Today";
+import { type Nav, type Route, pathOf, routeOf, tabOf } from "./router";
 
 // 札・招待はページを開いた瞬間に URL から抜いておく（描画より前に）
 const initialFragment = takeFragmentFromUrl();
 
-type Route = "home" | "family" | "settings";
-const PATHS: Record<Route, string> = { home: "/", family: "/family", settings: "/settings" };
-const routeOf = (path: string): Route => (path.startsWith("/settings") ? "settings" : path.startsWith("/family") ? "family" : "home");
+const TABS = [
+  ["today", "今日"],
+  ["chores", "家事"],
+  ["family", "家族"],
+  ["settings", "設定"],
+] as const;
 
 const FAMILY_KEY = "kaji.currentFamily";
 
@@ -71,8 +78,14 @@ export function App() {
   }, []);
 
   const go = (r: Route) => {
-    history.pushState(null, "", PATHS[r]);
+    history.pushState(null, "", pathOf(r));
     setRoute(r);
+    scrollTo(0, 0);
+  };
+  const nav: Nav = {
+    route,
+    go,
+    back: (fallback) => (history.length > 1 ? history.back() : go(fallback)),
   };
 
   if (ticket) return <TicketScreen token={ticket} onDone={() => setTicket(null)} />;
@@ -99,7 +112,7 @@ export function App() {
           selectFamily(familyId);
           await refreshMe();
           await loadFamilies(familyId);
-          go("home");
+          go({ name: "today" });
         }}
         onCancel={() => setInvite(null)}
       />
@@ -110,7 +123,7 @@ export function App() {
 
   const family = families.find((f) => f.id === currentId) ?? families[0];
 
-  if (!family && route !== "settings")
+  if (!family && route.name !== "settings")
     return <FamilyCreate displayName={me.user.displayName} onCreated={(f) => void loadFamilies(f.id)} />;
 
   return (
@@ -121,7 +134,7 @@ export function App() {
           href="/"
           onClick={(e) => {
             e.preventDefault();
-            go("home");
+            go({ name: "today" });
           }}
         >
           KajiTracker
@@ -138,26 +151,31 @@ export function App() {
             </select>
           </label>
         )}
-        <nav className="topnav" aria-label="画面">
-          {(
-            [
-              ["home", "今日"],
-              ["family", "家族"],
-              ["settings", "設定"],
-            ] as const
-          ).map(([r, label]) => (
-            <button key={r} className={route === r ? "is-current" : ""} aria-current={route === r ? "page" : undefined} onClick={() => go(r)}>
-              {label}
-            </button>
-          ))}
+        <nav className="tabs" aria-label="画面">
+          {TABS.map(([t, label]) => {
+            const current = tabOf(route) === t;
+            return (
+              <button key={t} className={current ? "is-current" : ""} aria-current={current ? "page" : undefined} onClick={() => go({ name: t } as Route)}>
+                {label}
+              </button>
+            );
+          })}
         </nav>
       </header>
-      {route === "settings" || !family ? (
+      {route.name === "settings" || !family ? (
         <Settings me={me} onChanged={refreshMe} onLoggedOut={() => setMe(null)} />
-      ) : route === "family" ? (
+      ) : route.name === "family" ? (
         <FamilyScreen me={me} family={family} onFamiliesChanged={loadFamilies} />
+      ) : route.name === "chores" ? (
+        <Chores family={family} nav={nav} />
+      ) : route.name === "chore-new" ? (
+        <ChoreForm family={family} nav={nav} />
+      ) : route.name === "chore-edit" ? (
+        <ChoreForm key={route.id} family={family} nav={nav} editId={route.id} />
+      ) : route.name === "chore" ? (
+        <ChoreDetail key={route.id} id={route.id} nav={nav} />
       ) : (
-        <Home me={me} family={family} />
+        <Today me={me} family={family} nav={nav} />
       )}
     </div>
   );

@@ -41,6 +41,7 @@ async function device(viewport, userAgent) {
   return page;
 }
 const h1 = (page, name) => page.getByRole("heading", { level: 1, name }).waitFor();
+const todayOf = (page, fam) => page.getByText(`${fam}の当番表`).waitFor();
 
 try {
   // ---- 最初の1人 ----
@@ -57,12 +58,12 @@ try {
   await phone.screenshot({ path: `${SHOTS}/02-family-create.png` });
   await phone.getByLabel("Family の名前").fill(family);
   await phone.getByRole("button", { name: "Family を作る" }).click();
-  await h1(phone, family);
+  await todayOf(phone, family);
   ok("最初の1人 → パスキー → Family を作る");
 
   // ---- 端末を追加（PC） ----
   step = "add-device";
-  await phone.getByRole("button", { name: "設定" }).click();
+  await phone.getByRole("button", { name: "設定", exact: true }).click();
   await phone.getByRole("button", { name: "端末を追加" }).click();
   await phone.getByAltText("端末を追加の QR コード").waitFor();
   await phone.screenshot({ path: `${SHOTS}/03-add-device.png` });
@@ -71,14 +72,14 @@ try {
   await pc.goto(deviceLink);
   await pc.getByLabel(/パスキーの名前/).fill("書斎の PC");
   await pc.getByRole("button", { name: "パスキーを作る" }).click();
-  await h1(pc, family);
+  await todayOf(pc, family);
   await phone.getByText(/Windows の Chromeが入りました/).waitFor({ timeout: 10000 });
   await phone.getByRole("button", { name: "閉じる" }).click();
   ok("端末を追加（PC で入り、スマホに「入りました」）");
 
   // ---- 家族を招待（妻・初めて） ----
   step = "invite";
-  await phone.getByRole("button", { name: "家族" }).click();
+  await phone.getByRole("button", { name: "家族", exact: true }).click();
   await h1(phone, family);
   await phone.getByRole("button", { name: "家族を招待" }).click();
   await phone.getByAltText("家族を招待の QR コード").waitFor();
@@ -91,7 +92,7 @@ try {
   await wife.getByLabel("名前").fill("はなこ");
   await wife.screenshot({ path: `${SHOTS}/05-invite-accept.png` });
   await wife.getByRole("button", { name: "パスキーを作って参加する" }).click();
-  await h1(wife, family);
+  await todayOf(wife, family);
   await phone.getByText("はなこさんが入りました").waitFor({ timeout: 10000 });
   await phone.getByRole("button", { name: "閉じる" }).click();
   await phone.getByText("はなこ", { exact: true }).waitFor();
@@ -108,10 +109,10 @@ try {
   const wifeNew = await device(PHONE, IPHONE);
   await wifeNew.goto(recoveryLink);
   await wifeNew.getByRole("button", { name: "パスキーを作る" }).click();
-  await h1(wifeNew, family);
+  await todayOf(wifeNew, family);
   await phone.getByText(/iPhone の Safariで入りました/).waitFor({ timeout: 10000 });
   await phone.getByRole("button", { name: "閉じる" }).click();
-  await wifeNew.getByRole("button", { name: "設定" }).click();
+  await wifeNew.getByRole("button", { name: "設定", exact: true }).click();
   await wifeNew.getByText("たくみさんが出した札で入った").waitFor();
   ok("妻を管理者に → 回復の札で妻の新しい iPhone が入る（「たくみさんが出した札」と残る）");
   await phone.screenshot({ path: `${SHOTS}/07-family.png`, fullPage: true });
@@ -131,16 +132,16 @@ try {
 
   // ---- ログアウトしてパスキーでログイン ----
   step = "relogin";
-  await phone.getByRole("button", { name: "設定" }).click();
+  await phone.getByRole("button", { name: "設定", exact: true }).click();
   await phone.getByRole("button", { name: "ログアウト" }).click();
   await phone.getByRole("button", { name: "パスキーでログイン" }).click();
   await h1(phone, "設定");
-  await wife.getByRole("button", { name: "設定" }).click();
+  await wife.getByRole("button", { name: "設定", exact: true }).click();
   await wife.getByRole("button", { name: "ログアウト" }).click();
   await wife.getByRole("button", { name: "パスキーでログイン" }).click();
   await h1(wife, "設定");
   ok("たくみ・妻とも、ログアウトしてパスキーでログインし直せる");
-  await pc.getByRole("button", { name: "家族" }).click();
+  await pc.getByRole("button", { name: "家族", exact: true }).click();
   await h1(pc, family);
   await pc.screenshot({ path: `${SHOTS}/09-family-pc.png`, fullPage: true });
 } catch (e) {

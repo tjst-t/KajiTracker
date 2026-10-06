@@ -189,7 +189,9 @@ PK は (key, window_start)。
 
 ## 4. 画面
 
-スマホでは下にタブ（今日・家事・統計・設定）、PC では左にサイドバー。上に Family の切り替え。
+タブは「今日・家事・家族・設定」。スマホでは画面の下に固定、PC ではヘッダーの右。Family が2つ以上なら上に切り替え。統計は「統計」のストーリーでタブを足す。
+
+今日の画面は「当番表」。期限が来ている家事を「当番札」（左に紐の穴、黒い縁）で並べ、遅れは朱の判子「3日遅れ」、今日は藍の判子「今日」。「やった」を押すと札が裏返って「済」と取り消しを6秒見せ、そのあと並べ直す（動きを減らす設定では裏返さずに切り替える）。
 
 | # | 画面 | 主に使う | 中身 |
 |---|---|---|---|
@@ -237,10 +239,10 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
 - `POST /families/:fid/members/:uid/recovery-ticket`（管理者★）
 
 **家事と記録**
-- `GET /families/:fid/chores`（期限・状態つき）、`POST /families/:fid/chores`
-- `GET /chores/:id`、`PATCH /chores/:id`、`DELETE /chores/:id`
-- `POST /chores/:id/logs`（`done_on` は省くと今日）、`DELETE /logs/:id`（取り消し）
-- `GET /chores/:id/logs`
+- `GET /families/:fid/chores`（期限・状態・前回の記録つき。`?archived=1` でしまった家事も）、`POST /families/:fid/chores`
+- `GET /chores/:id`（記録・回・家事ごとの統計つき）、`PATCH /chores/:id`（`archived` でしまう・戻す）、`DELETE /chores/:id`
+- `POST /chores/:id/logs`（`doneOn` は省くと今日。先の日付は断る）、`DELETE /logs/:id`（取り消し。家族のだれでも）
+- 周期の入力：`{type:"interval", intervalDays, firstDueOn}` か `{type:"calendar", rule}`。毎週・毎月は anchor を省くと登録した日（編集では前の基準日）。隔週・数か月ごとは anchor 必須で、規則に当たる日でなければ断る
 
 **統計**
 - `GET /families/:fid/stats?from=&to=`
