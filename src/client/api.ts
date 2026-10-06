@@ -37,3 +37,7 @@ export type SessionItem = {
   lastUsedAt: string;
   current: boolean;
 };
+
+export type Role = "admin" | "member";
+export type Family = { id: string; name: string; role: Role };
+export type Member = { userId: string; displayName: string; role: Role; joinedAt: string; isMe: boolean };

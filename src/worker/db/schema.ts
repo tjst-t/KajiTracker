@@ -61,6 +61,8 @@ export const webauthnChallenges = sqliteTable("webauthn_challenges", {
   challenge: text().notNull(),
   purpose: text({ enum: ["register", "authenticate", "step_up"] }).notNull(),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+  /** 招待から新しく登録するときの、まだ作っていないユーザーの情報（JSON） */
+  data: text(),
   expiresAt: text("expires_at").notNull(),
 });
 

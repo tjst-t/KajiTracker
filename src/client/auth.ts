@@ -42,10 +42,20 @@ export async function withStepUp<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-/** URL のフラグメント #login=… から札を取り出し、すぐ URL から消す（履歴にも残さない） */
-export function takeTicketFromUrl(): string | null {
-  const m = /^#login=([A-Za-z0-9_-]+)$/.exec(location.hash);
+/** 招待から初めて登録する：名前 → この端末のパスキー → Family に参加してログイン */
+export async function registerViaInvite(token: string, displayName: string) {
+  const optionsJSON = await api<Parameters<typeof startRegistration>[0]["optionsJSON"]>("POST", "/invites/register/options", { token, displayName });
+  const response = await startRegistration({ optionsJSON }).catch(explain);
+  return api<{ familyId: string }>("POST", "/invites/register/verify", { token, response });
+}
+
+/**
+ * URL のフラグメントから札（#login=…）か招待（#invite=…）を取り出し、すぐ URL から消す（履歴にも残さない）。
+ * フラグメントはサーバのアクセスログにも Referer にも残らない
+ */
+export function takeFragmentFromUrl(): { kind: "login" | "invite"; token: string } | null {
+  const m = /^#(login|invite)=([A-Za-z0-9_-]+)$/.exec(location.hash);
   if (!m) return null;
   history.replaceState(null, "", location.pathname + location.search);
-  return m[1] ?? null;
+  return { kind: m[1] as "login" | "invite", token: m[2]! };
 }

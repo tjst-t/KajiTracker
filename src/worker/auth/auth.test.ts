@@ -153,7 +153,7 @@ describe("端末を追加", () => {
     const t = await phone.post("/api/me/device-tickets");
     expect(t.status).toBe(200);
     expect(t.json.url).toMatch(/^http:\/\/localhost:5173\/#login=/);
-    expect((await phone.get(`/api/me/device-tickets/${t.json.id}`)).json).toEqual({ used: false, deviceLabel: null, expired: false });
+    expect((await phone.get(`/api/me/tickets/${t.json.id}`)).json).toEqual({ used: false, deviceLabel: null, expired: false });
 
     const pc = new TestDevice("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36");
     const token = t.json.url.split("#login=")[1];
@@ -161,7 +161,7 @@ describe("端末を追加", () => {
     expect((await pc.redeem(token)).status).toBe(200);
     expect((await pc.get("/api/me")).json).toMatchObject({ user: { displayName: "たくみ" }, session: { via: "device_ticket", stepUpOk: true } });
 
-    expect((await phone.get(`/api/me/device-tickets/${t.json.id}`)).json).toEqual({ used: true, deviceLabel: "Windows の Chrome", expired: false });
+    expect((await phone.get(`/api/me/tickets/${t.json.id}`)).json).toEqual({ used: true, deviceLabel: "Windows の Chrome", expired: false });
 
     // 入った直後は、すでにパスキーがあっても自分のパスキーを登録できる（banto で分かった落とし穴）
     const reg = await pc.registerPasskey();
@@ -174,7 +174,7 @@ describe("端末を追加", () => {
     const a = await bootstrapUser("A");
     const b = await bootstrapUser("B");
     const t = await a.post("/api/me/device-tickets");
-    expect((await b.get(`/api/me/device-tickets/${t.json.id}`)).status).toBe(404);
+    expect((await b.get(`/api/me/tickets/${t.json.id}`)).status).toBe(404);
   });
 });
 

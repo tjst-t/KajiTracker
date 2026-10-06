@@ -28,14 +28,23 @@ export const TICKET_TTL = 10 * MINUTE;
 const CHAL_COOKIE = "kaji-chal";
 const chalCookieOpts = (c: Ctx) => ({ path: "/", secure: c.get("site").secure, ...(c.get("site").secure ? { prefix: "host" as const } : {}) });
 
-async function saveChallenge(c: Ctx, challenge: string, purpose: "register" | "authenticate" | "step_up", userId: string | null) {
+export async function saveChallenge(
+  c: Ctx,
+  challenge: string,
+  purpose: "register" | "authenticate" | "step_up",
+  userId: string | null,
+  data?: unknown,
+) {
   const id = newId();
-  await c.get("db").insert(webauthnChallenges).values({ id, challenge, purpose, userId, expiresAt: isoAfter(CHALLENGE_TTL) });
+  await c
+    .get("db")
+    .insert(webauthnChallenges)
+    .values({ id, challenge, purpose, userId, data: data === undefined ? null : JSON.stringify(data), expiresAt: isoAfter(CHALLENGE_TTL) });
   setCookie(c, CHAL_COOKIE, id, { ...chalCookieOpts(c), httpOnly: true, sameSite: "Strict", maxAge: CHALLENGE_TTL / 1000 });
 }
 
 /** challenge を取り出して消す（1回だけ使える） */
-async function takeChallenge(c: Ctx, purpose: "register" | "authenticate" | "step_up", userId: string | null): Promise<string> {
+export async function takeChallengeRow(c: Ctx, purpose: "register" | "authenticate" | "step_up", userId: string | null) {
   const id = c.get("site").secure ? getCookie(c, CHAL_COOKIE, "host") : getCookie(c, CHAL_COOKIE);
   deleteCookie(c, CHAL_COOKIE, chalCookieOpts(c));
   if (!id) fail(400, "やり直してください（確認の期限が切れました）", "challenge_missing");
@@ -43,15 +52,19 @@ async function takeChallenge(c: Ctx, purpose: "register" | "authenticate" | "ste
   if (!row || row.purpose !== purpose || row.userId !== userId || row.expiresAt < nowIso()) {
     fail(400, "やり直してください（確認の期限が切れました）", "challenge_invalid");
   }
-  return row.challenge;
+  return row;
 }
 
-async function requireStepUp(c: Ctx) {
+async function takeChallenge(c: Ctx, purpose: "register" | "authenticate" | "step_up", userId: string | null): Promise<string> {
+  return (await takeChallengeRow(c, purpose, userId)).challenge;
+}
+
+export async function requireStepUp(c: Ctx) {
   const { session } = requireAuth(c);
   if (!(await stepUpSatisfied(c, session))) fail(403, "パスキーでもう一度確認してください", "step_up_required");
 }
 
-async function body<T>(c: Ctx): Promise<Partial<T>> {
+export async function body<T>(c: Ctx): Promise<Partial<T>> {
   try {
     return (await c.req.json()) as Partial<T>;
   } catch {
@@ -97,6 +110,36 @@ async function verifyAssertion(c: Ctx, response: AuthenticationResponseJSON | un
   return pk;
 }
 
+/** 新しいパスキーの応答を確かめ、passkeys に入れる行を返す（まだ入れない） */
+export async function verifyNewPasskey(c: Ctx, response: RegistrationResponseJSON | undefined, challenge: string, userId: string, name?: string) {
+  if (!response) fail(400, "パスキーの応答がありません");
+  const site = c.get("site");
+  let info;
+  try {
+    const r = await verifyRegistrationResponse({
+      response,
+      expectedChallenge: challenge,
+      expectedOrigin: site.origin,
+      expectedRPID: site.rpId,
+      requireUserVerification: true,
+    });
+    info = r.verified ? r.registrationInfo : undefined;
+  } catch (e) {
+    console.warn("passkey register failed", e);
+  }
+  if (!info) fail(400, "パスキーを登録できませんでした", "passkey_failed");
+  return {
+    id: info.credential.id,
+    userId,
+    publicKey: bytesToBase64url(info.credential.publicKey),
+    counter: info.credential.counter,
+    transports: JSON.stringify(response.response.transports ?? []),
+    name: name?.trim().slice(0, 40) || deviceLabel(c.req.header("User-Agent")),
+  };
+}
+
+export const RP = { name: RP_NAME };
+
 const meOf = async (c: Ctx) => {
   const { user, session } = requireAuth(c);
   const count = (await c.get("db").select({ id: passkeys.id }).from(passkeys).where(eq(passkeys.userId, user.id)).all()).length;
@@ -126,7 +169,7 @@ export const authRoutes = new Hono<AppEnv>()
 
   // ---- 札（端末を追加・回復・最初の1人） ----
   .post("/auth/ticket-info", async (c) => {
-    await rateLimit(c, "redeem", 10);
+    await rateLimit(c, "ticket-info", 30);
     const { token } = await body<{ token: string }>(c);
     if (!token) fail(400, "札がありません");
     const t = await c.get("db").select().from(loginTickets).where(eq(loginTickets.id, await sha256Hex(token))).get();
@@ -185,30 +228,7 @@ export const authRoutes = new Hono<AppEnv>()
     const { user } = requireAuth(c);
     const { response, name } = await body<{ response: RegistrationResponseJSON; name: string }>(c);
     const challenge = await takeChallenge(c, "register", user.id);
-    if (!response) fail(400, "パスキーの応答がありません");
-    const site = c.get("site");
-    let info;
-    try {
-      const r = await verifyRegistrationResponse({
-        response,
-        expectedChallenge: challenge,
-        expectedOrigin: site.origin,
-        expectedRPID: site.rpId,
-        requireUserVerification: true,
-      });
-      info = r.verified ? r.registrationInfo : undefined;
-    } catch (e) {
-      console.warn("passkey register failed", e);
-    }
-    if (!info) fail(400, "パスキーを登録できませんでした", "passkey_failed");
-    const row = {
-      id: info.credential.id,
-      userId: user.id,
-      publicKey: bytesToBase64url(info.credential.publicKey),
-      counter: info.credential.counter,
-      transports: JSON.stringify(response.response.transports ?? []),
-      name: name?.trim().slice(0, 40) || deviceLabel(c.req.header("User-Agent")),
-    };
+    const row = await verifyNewPasskey(c, response, challenge, user.id, name);
     await c.get("db").insert(passkeys).values(row);
     return c.json({ id: row.id, name: row.name });
   })
@@ -319,7 +339,8 @@ export const authRoutes = new Hono<AppEnv>()
     await c.get("db").insert(loginTickets).values({ id, kind: "device", userId: user.id, issuedByUserId: user.id, expiresAt });
     return c.json({ id, url: `${c.get("site").origin}/#login=${token}`, expiresAt });
   })
-  .get("/me/device-tickets/:id", async (c) => {
+  // 自分が出した札（端末を追加・回復）が使われたか
+  .get("/me/tickets/:id", async (c) => {
     const { user } = requireAuth(c);
     const t = await c
       .get("db")

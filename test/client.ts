@@ -74,6 +74,16 @@ export class TestDevice {
     return r;
   }
 
+  /** 招待から初めて登録する（名前 → パスキー作成 → 参加） */
+  async registerViaInvite(token: string, displayName: string) {
+    const opts = await this.post("/api/invites/register/options", { token, displayName });
+    if (opts.status !== 200) return opts;
+    const response = await this.authenticator.register(opts.json, ORIGIN);
+    const r = await this.post("/api/invites/register/verify", { token, response });
+    if (r.status === 200) await this.rememberUser();
+    return r;
+  }
+
   async stepUp() {
     const opts = await this.post("/api/auth/step-up/options");
     const response = await this.authenticator.authenticate(opts.json, ORIGIN);

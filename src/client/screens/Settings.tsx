@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { type Me, type PasskeyItem, type SessionItem, type SessionVia, api } from "../api";
 import { registerPasskey, withStepUp } from "../auth";
-import { AddDeviceDialog } from "../components/AddDeviceDialog";
+import { type IssuedQr, QrDialog } from "../components/QrDialog";
 import { errorText, formatDateTime } from "../format";
 
 const TIMES = Array.from({ length: 96 }, (_, i) => `${String(Math.floor(i / 4)).padStart(2, "0")}:${String((i % 4) * 15).padStart(2, "0")}`);
@@ -177,7 +177,21 @@ export function Settings({ me, onChanged, onLoggedOut }: { me: Me; onChanged: ()
       </section>
 
       {adding && (
-        <AddDeviceDialog
+        <QrDialog
+          title="端末を追加"
+          intro="新しい端末のカメラで読み取ってください。PC にはリンクを送っても入れます。"
+          caution="1回使うと終わりです。このリンクは家族にも送らないでください（あなたとして入れてしまいます）。"
+          issue={() => withStepUp(() => api<IssuedQr>("POST", "/me/device-tickets"))}
+          poll={async (id) => {
+            const s = await api<{ used: boolean; deviceLabel: string | null; expired: boolean }>("GET", `/me/tickets/${id}`);
+            return { used: s.used, who: s.deviceLabel, expired: s.expired };
+          }}
+          joined={(who) => (
+            <>
+              <p className="done-mark">{who ?? "新しい端末"}が入りました</p>
+              <p>その端末で、続けてパスキーを作ってもらってください。</p>
+            </>
+          )}
           onClose={() => {
             setAdding(false);
             void reload();

@@ -222,17 +222,17 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
 - `GET /me`、`PATCH /me`（表示名・通知の時刻）
 - `GET /me/passkeys`、`DELETE /me/passkeys/:id`★
 - `GET /me/sessions`、`DELETE /me/sessions/:id`★
-- `POST /me/device-tickets`★（QR とリンクの札を出す）、`GET /me/device-tickets/:id`（使われたか）
+- `POST /me/device-tickets`★（QR とリンクの札を出す）、`GET /me/tickets/:id`（自分が出した札＝端末を追加・回復が使われたか）
 
 **招待**
-- `POST /families/:fid/invites`（管理者）
-- `GET /invites/:token`（Family の名前を見せる）
-- `POST /invites/:token/register/options`・`/register/verify`（初めての人：ユーザーを作ってパスキー登録して参加）
-- `POST /invites/:token/accept`（ログイン済みの人が参加）
+- `POST /families/:fid/invites`（管理者）、`GET /families/:fid/invites/:id`（使われたか・だれが入ったか）
+- `POST /invites/info`（招待の中身。ログイン不要。招待の値は本文で渡す）
+- `POST /invites/register/options`・`/invites/register/verify`（初めての人：名前とパスキーを確かめてから、招待を使い、ユーザー・パスキー・メンバーを作ってログインさせる。まだ作っていないユーザーの情報は challenge の行の data に置く）
+- `POST /invites/accept`（ログイン済みの人が参加）
 
 **Family**
 - `GET /families`、`POST /families`
-- `PATCH /families/:fid`（名前、管理者）、`DELETE /families/:fid`（管理者、名前の確認つき）
+- `PATCH /families/:fid`（名前、管理者）、`DELETE /families/:fid`（管理者、名前の確認と★）
 - `GET /families/:fid/members`、`PATCH /families/:fid/members/:uid`（役割、管理者）、`DELETE /families/:fid/members/:uid`（外す・抜ける）
 - `POST /families/:fid/members/:uid/recovery-ticket`（管理者★）
 
