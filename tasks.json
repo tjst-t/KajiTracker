@@ -99,7 +99,10 @@
       "title": "家事と記録・今日の画面",
       "status": "ready",
       "parent": null,
-      "dependsOn": [],
+      "dependsOn": [
+        "interval-calendar",
+        "family-qr"
+      ],
       "milestone": null,
       "priority": "normal",
       "labels": [],
@@ -109,7 +112,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-06T02:51:10.567Z",
-      "updatedAt": "2026-10-06T02:51:10.567Z",
+      "updatedAt": "2026-10-06T02:51:27.211Z",
       "closedAt": null,
       "extra": {}
     },
