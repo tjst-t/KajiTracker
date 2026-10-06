@@ -64,6 +64,27 @@
       "updatedAt": "2026-10-06T02:51:10.324Z",
       "closedAt": null,
       "extra": {}
+    },
+    {
+      "id": "family-qr",
+      "number": 4,
+      "kind": "story",
+      "title": "Family と招待（QR）・回復の札",
+      "status": "ready",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "normal",
+      "labels": [],
+      "body": "docs/spec.md「Family」「全部の端末をなくしたとき」。",
+      "doneWhen": "Family の作成・切り替え、招待 QR から新規登録して参加、役割の変更、抜ける・外す・削除、管理者による回復の札がテストで通る",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-06T02:51:10.444Z",
+      "updatedAt": "2026-10-06T02:51:10.444Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
