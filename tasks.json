@@ -169,7 +169,10 @@
       "title": "PWA とスマホ実機での確認",
       "status": "ready",
       "parent": null,
-      "dependsOn": [],
+      "dependsOn": [
+        "item-2",
+        "web-push-cron"
+      ],
       "milestone": null,
       "priority": "normal",
       "labels": [],
@@ -179,7 +182,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-06T02:51:10.971Z",
-      "updatedAt": "2026-10-06T02:51:10.971Z",
+      "updatedAt": "2026-10-06T02:51:30.941Z",
       "closedAt": null,
       "extra": {}
     },
