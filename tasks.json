@@ -76,7 +76,9 @@
       "title": "Family と招待（QR）・回復の札",
       "status": "ready",
       "parent": null,
-      "dependsOn": [],
+      "dependsOn": [
+        "item-1"
+      ],
       "milestone": null,
       "priority": "normal",
       "labels": [],
@@ -86,7 +88,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-06T02:51:10.444Z",
-      "updatedAt": "2026-10-06T02:51:10.444Z",
+      "updatedAt": "2026-10-06T02:51:25.968Z",
       "closedAt": null,
       "extra": {}
     },
