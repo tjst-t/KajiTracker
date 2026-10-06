@@ -106,6 +106,27 @@
       "updatedAt": "2026-10-06T02:51:10.567Z",
       "closedAt": null,
       "extra": {}
+    },
+    {
+      "id": "web-push-cron",
+      "number": 6,
+      "kind": "story",
+      "title": "通知：Web Push と Cron",
+      "status": "ready",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "normal",
+      "labels": [],
+      "body": "docs/design.md の 3。Web Push のライブラリは @block65/webcrypto-web-push か PushForge を試して決める。",
+      "doneWhen": "ローカルで --test-scheduled を叩くと、期限が今日の家事が担当者（いなければ全員）に、家事か人の時刻で1通にまとまって届く。二重に送らない",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-06T02:51:10.678Z",
+      "updatedAt": "2026-10-06T02:51:10.678Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
