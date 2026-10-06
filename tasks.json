@@ -169,6 +169,27 @@
       "updatedAt": "2026-10-06T02:51:10.971Z",
       "closedAt": null,
       "extra": {}
+    },
+    {
+      "id": "kaji-tjstkm-net",
+      "number": 9,
+      "kind": "story",
+      "title": "本番へのデプロイ（kaji.tjstkm.net）",
+      "status": "backlog",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "normal",
+      "labels": [],
+      "body": "Cloudflare のアカウントと API トークン（Vault）、tjstkm.net が Cloudflare の DNS にあるかの確認が要る。D1 の作成、VAPID 鍵の secret 登録、カスタムドメイン、bootstrap-link で最初の1人。",
+      "doneWhen": "https://kaji.tjstkm.net でログインし、家事を登録して通知が届く",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-06T02:51:11.117Z",
+      "updatedAt": "2026-10-06T02:51:11.117Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
