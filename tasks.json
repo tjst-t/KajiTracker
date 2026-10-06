@@ -61,7 +61,7 @@
       "number": 3,
       "kind": "story",
       "title": "ログイン：パスキー・札・セッション",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [
         "api-d1"
@@ -73,9 +73,14 @@
       "doneWhen": "bootstrap の札で最初の1人を作り、パスキーでログイン・端末を追加・締め出し・step-up がテストと PC の localhost で確かめられる",
       "resolution": null,
       "refs": [],
-      "threads": [],
+      "threads": [
+        {
+          "projectId": "ae103b83-45a2-4ce2-9171-88a72857b841",
+          "threadId": "0bf4949a-52fb-42bd-b5ed-08fbbd34d99a"
+        }
+      ],
       "createdAt": "2026-10-06T02:51:10.324Z",
-      "updatedAt": "2026-10-06T02:51:24.772Z",
+      "updatedAt": "2026-10-06T03:27:10.405Z",
       "closedAt": null,
       "extra": {}
     },
