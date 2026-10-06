@@ -14,7 +14,8 @@
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "cf-typegen": "wrangler types src/worker/worker-configuration.d.ts",
     "bootstrap-link": "node scripts/bootstrap-link.mjs",
-    "e2e": "node e2e/login-flow.mjs"
+    "e2e": "node e2e/login-flow.mjs",
+    "db:reset:local": "node scripts/reset-local-db.mjs"
   },
   "dependencies": {
     "@simplewebauthn/browser": "^14.0.0",
