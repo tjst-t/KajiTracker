@@ -7,7 +7,7 @@
       "number": 1,
       "kind": "story",
       "title": "雛形：ローカルで画面と API と D1 が動く",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [],
       "milestone": null,
@@ -17,9 +17,14 @@
       "doneWhen": "npm run dev で画面と /api/health が返り、ローカル D1 にマイグレーションが当たり、npm test が通る",
       "resolution": null,
       "refs": [],
-      "threads": [],
+      "threads": [
+        {
+          "projectId": "ae103b83-45a2-4ce2-9171-88a72857b841",
+          "threadId": "0bf4949a-52fb-42bd-b5ed-08fbbd34d99a"
+        }
+      ],
       "createdAt": "2026-10-06T02:51:07.862Z",
-      "updatedAt": "2026-10-06T02:51:07.862Z",
+      "updatedAt": "2026-10-06T02:51:42.024Z",
       "closedAt": null,
       "extra": {}
     },
