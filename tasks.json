@@ -43,6 +43,27 @@
       "updatedAt": "2026-10-06T02:51:10.204Z",
       "closedAt": null,
       "extra": {}
+    },
+    {
+      "id": "item-1",
+      "number": 3,
+      "kind": "story",
+      "title": "ログイン：パスキー・札・セッション",
+      "status": "ready",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "high",
+      "labels": [],
+      "body": "docs/spec.md「アカウントとログイン」、docs/design.md の 1・5・6。banto の packages/core/src/auth/ を参考にする。",
+      "doneWhen": "bootstrap の札で最初の1人を作り、パスキーでログイン・端末を追加・締め出し・step-up がテストと PC の localhost で確かめられる",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-06T02:51:10.324Z",
+      "updatedAt": "2026-10-06T02:51:10.324Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
