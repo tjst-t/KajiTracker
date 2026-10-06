@@ -1,0 +1,27 @@
+{
+  "format": "banto-backlog/1",
+  "milestones": [],
+  "items": [
+    {
+      "id": "api-d1",
+      "number": 1,
+      "kind": "story",
+      "title": "雛形：ローカルで画面と API と D1 が動く",
+      "status": "ready",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "high",
+      "labels": [],
+      "body": "React＋Vite（@cloudflare/vite-plugin）＋Hono＋D1（Drizzle）＋Vitest（vitest-pool-workers）の土台。docs/design.md の 1 と 7。",
+      "doneWhen": "npm run dev で画面と /api/health が返り、ローカル D1 にマイグレーションが当たり、npm test が通る",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-06T02:51:07.862Z",
+      "updatedAt": "2026-10-06T02:51:07.862Z",
+      "closedAt": null,
+      "extra": {}
+    }
+  ]
+}
