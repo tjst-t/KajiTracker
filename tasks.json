@@ -89,7 +89,7 @@
       "number": 4,
       "kind": "story",
       "title": "Family と招待（QR）・回復の札",
-      "status": "in-progress",
+      "status": "done",
       "parent": null,
       "dependsOn": [
         "item-1"
@@ -99,7 +99,7 @@
       "labels": [],
       "body": "docs/spec.md「Family」「全部の端末をなくしたとき」。",
       "doneWhen": "Family の作成・切り替え、招待 QR から新規登録して参加、役割の変更、抜ける・外す・削除、管理者による回復の札がテストで通る",
-      "resolution": null,
+      "resolution": "src/worker/families/routes.ts と画面（Family を作る・家族・招待を受ける・Family の切り替え）。Workers のテスト 81 件通過（Family 20 件：招待の1回限り・同時に2人が使ったとき・24時間・役割・最後の管理者・抜ける/外す・削除の cascade・回復の札）。npm run e2e で、最初の1人 → Family 作成 → 端末を追加 → 招待で妻が登録して参加 → 妻を管理者に → 回復の札で妻の新しい端末が入る → 2つ目の Family と切り替え → ログインし直し、を本物の Chromium で確認。commit b2abd1d。",
       "refs": [],
       "threads": [
         {
@@ -108,8 +108,8 @@
         }
       ],
       "createdAt": "2026-10-06T02:51:10.444Z",
-      "updatedAt": "2026-10-06T03:57:17.981Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-06T04:13:27.678Z",
+      "closedAt": "2026-10-06T04:13:27.678Z",
       "extra": {}
     },
     {
