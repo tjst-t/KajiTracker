@@ -123,7 +123,9 @@
       "title": "通知：Web Push と Cron",
       "status": "ready",
       "parent": null,
-      "dependsOn": [],
+      "dependsOn": [
+        "item-2"
+      ],
       "milestone": null,
       "priority": "normal",
       "labels": [],
@@ -133,7 +135,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-06T02:51:10.678Z",
-      "updatedAt": "2026-10-06T02:51:10.678Z",
+      "updatedAt": "2026-10-06T02:51:28.446Z",
       "closedAt": null,
       "extra": {}
     },
