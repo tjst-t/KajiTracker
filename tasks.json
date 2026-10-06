@@ -33,7 +33,7 @@
       "number": 2,
       "kind": "story",
       "title": "期限の計算（interval と calendar）",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [
         "api-d1"
@@ -45,9 +45,14 @@
       "doneWhen": "spec の全パターン（毎週複数曜日・隔週・第n曜日・最終曜日・毎月○日・月末・nか月ごと・打ち切り・遅れ日数）をテストが通る",
       "resolution": null,
       "refs": [],
-      "threads": [],
+      "threads": [
+        {
+          "projectId": "ae103b83-45a2-4ce2-9171-88a72857b841",
+          "threadId": "0bf4949a-52fb-42bd-b5ed-08fbbd34d99a"
+        }
+      ],
       "createdAt": "2026-10-06T02:51:10.204Z",
-      "updatedAt": "2026-10-06T03:11:46.406Z",
+      "updatedAt": "2026-10-06T03:13:22.699Z",
       "closedAt": null,
       "extra": {}
     },
