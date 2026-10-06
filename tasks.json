@@ -193,7 +193,9 @@
       "title": "本番へのデプロイ（kaji.tjstkm.net）",
       "status": "backlog",
       "parent": null,
-      "dependsOn": [],
+      "dependsOn": [
+        "pwa"
+      ],
       "milestone": null,
       "priority": "normal",
       "labels": [],
@@ -203,7 +205,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-06T02:51:11.117Z",
-      "updatedAt": "2026-10-06T02:51:11.117Z",
+      "updatedAt": "2026-10-06T02:51:32.166Z",
       "closedAt": null,
       "extra": {}
     }
