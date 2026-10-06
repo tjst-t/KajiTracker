@@ -148,6 +148,27 @@
       "updatedAt": "2026-10-06T02:51:10.821Z",
       "closedAt": null,
       "extra": {}
+    },
+    {
+      "id": "pwa",
+      "number": 8,
+      "kind": "story",
+      "title": "PWA とスマホ実機での確認",
+      "status": "ready",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "normal",
+      "labels": [],
+      "body": "vite-plugin-pwa、ホーム画面に追加の案内（S12）。banto の公開機能で HTTPS の URL を付けて実機で試す。",
+      "doneWhen": "iPhone と Android でホーム画面に追加でき、パスキーでログインし、通知が届く",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-06T02:51:10.971Z",
+      "updatedAt": "2026-10-06T02:51:10.971Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
