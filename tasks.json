@@ -117,7 +117,7 @@
       "number": 5,
       "kind": "story",
       "title": "家事と記録・今日の画面",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [
         "interval-calendar",
@@ -130,9 +130,14 @@
       "doneWhen": "スマホ幅で今日の画面の上に期限の来た家事が遅れ日数つきで出て、ワンタップで記録・取り消しでき、PC 幅で家事を登録・編集できる",
       "resolution": null,
       "refs": [],
-      "threads": [],
+      "threads": [
+        {
+          "projectId": "ae103b83-45a2-4ce2-9171-88a72857b841",
+          "threadId": "0bf4949a-52fb-42bd-b5ed-08fbbd34d99a"
+        }
+      ],
       "createdAt": "2026-10-06T02:51:10.567Z",
-      "updatedAt": "2026-10-06T02:51:27.211Z",
+      "updatedAt": "2026-10-06T05:14:43.131Z",
       "closedAt": null,
       "extra": {}
     },
