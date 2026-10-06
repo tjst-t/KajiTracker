@@ -33,7 +33,7 @@
       "number": 2,
       "kind": "story",
       "title": "期限の計算（interval と calendar）",
-      "status": "in-progress",
+      "status": "done",
       "parent": null,
       "dependsOn": [
         "api-d1"
@@ -43,7 +43,7 @@
       "labels": [],
       "body": "src/shared/schedule.ts の純粋な関数。docs/design.md の 2。カレンダーの前倒しは「次の1回分だけ、次の予定日の分として数える」で決定（2026-10-06）。",
       "doneWhen": "spec の全パターン（毎週複数曜日・隔週・第n曜日・最終曜日・毎月○日・月末・nか月ごと・打ち切り・遅れ日数）をテストが通る",
-      "resolution": null,
+      "resolution": "src/shared/schedule.ts（evaluate・isOccurrence・parseCalendarRule）と src/shared/date.ts。テスト 38 件（全体 39 件）通過、tsc -b 通過。commit 08a32ca。隔週・nか月ごとは登録で最初の予定日を選び anchor にする、と design.md に追記。",
       "refs": [],
       "threads": [
         {
@@ -52,8 +52,8 @@
         }
       ],
       "createdAt": "2026-10-06T02:51:10.204Z",
-      "updatedAt": "2026-10-06T03:13:22.699Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-06T03:15:50.909Z",
+      "closedAt": "2026-10-06T03:15:50.909Z",
       "extra": {}
     },
     {
