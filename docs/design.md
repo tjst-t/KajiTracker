@@ -253,10 +253,10 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
 - `POST /chores/:id/logs`（`doneOn` は省くと今日。先の日付は断る）、`DELETE /logs/:id`（取り消し。家族のだれでも）
 - 周期の入力：`{type:"interval", intervalDays, firstDueOn}` か `{type:"calendar", rule}`。毎週・毎月は anchor を省くと登録した日（編集では前の基準日）。隔週・数か月ごとは anchor 必須で、規則に当たる日でなければ断る
 
-**統計**
 - `GET /families/:fid/groups`、`POST /families/:fid/groups`、`PATCH /groups/:id`（名前・並び順）、`DELETE /groups/:id`（家事はグループなしに）
 - `POST /families/:fid/chores/bulk`（まとめて登録。1行でも不備があれば1件も入れず、`rows: [{index, message}]` を返す。100件まで）
 
+**統計**
 - `GET /families/:fid/stats?from=&to=`
 
 **通知**
