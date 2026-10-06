@@ -20,9 +20,9 @@
   // 当日の通知：15分ごとに起こす（docs/design.md の 3）
   "triggers": { "crons": ["*/15 * * * *"] },
   "vars": {
-    // パスキーの RP ID と画面のオリジン。本番は kaji.tjstkm.net に上書きする
-    "RP_ID": "localhost",
-    "ORIGIN": "http://localhost:5173"
+    // 画面のオリジン（カンマ区切り）。パスキーの RP ID はそのホスト名。
+    // 本番は "https://kaji.tjstkm.net" だけにする。開発で公開 URL を足すときは .dev.vars で上書きする
+    "ORIGINS": "http://localhost:5173"
   },
   "observability": { "enabled": true }
 }

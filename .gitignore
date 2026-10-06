@@ -3,3 +3,4 @@ dist/
 .wrangler/
 .dev.vars
 *.tsbuildinfo
+e2e/screenshots/

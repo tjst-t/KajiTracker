@@ -1,0 +1,369 @@
+/* KajiTracker の見た目。
+   地は青磁がかった薄い灰緑、文字は墨、操作は藍。済みは若竹。字は Zen Maru Gothic だけ。
+   1列・左寄せ。カードは使わず、見出しと細い線で区切る。 */
+:root {
+  --ground: #f1f4f1;
+  --surface: #ffffff;
+  --ink: #22302c;
+  --ink-soft: #56645f;
+  --line: #d3dbd5;
+  --ai: #2f4f6f; /* 藍：操作 */
+  --ai-deep: #223b54;
+  --wakatake: #4f7f5a; /* 若竹：済み・成功 */
+  --danger: #a93b32;
+  --focus: #e0a526;
+
+  --font: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "BIZ UDPGothic", system-ui, sans-serif;
+  /* 1.25 倍きざみ */
+  --t-small: 0.875rem;
+  --t-body: 1rem;
+  --t-h2: 1.25rem;
+  --t-h1: 1.5625rem;
+  --t-mark: 2.75rem;
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 100%;
+  line-height: 1.75;
+  -webkit-text-size-adjust: 100%;
+  word-break: auto-phrase; /* 日本語を文節で折り返す（対応しないブラウザでは普通に折り返す） */
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+}
+
+h1,
+h2 {
+  line-height: 1.35;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+h1 {
+  font-size: var(--t-h1);
+}
+h2 {
+  font-size: var(--t-h2);
+}
+p {
+  margin: 0 0 1rem;
+  max-width: 38em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---- 骨組み ---- */
+
+.page {
+  padding: 1.5rem 1.25rem 4rem;
+  max-width: 40rem;
+}
+.page--narrow {
+  max-width: 30rem;
+}
+
+.page--login {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 30rem;
+  padding-block: 3rem;
+}
+
+.shell {
+  min-height: 100dvh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.topnav {
+  display: flex;
+  gap: 0.25rem;
+}
+.topnav button {
+  font: inherit;
+  font-size: var(--t-small);
+  background: none;
+  border: 0;
+  color: var(--ink-soft);
+  padding: 0.375rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.topnav button.is-current {
+  color: var(--surface);
+  background: var(--ai);
+}
+
+/* ---- ワードマーク：この画面でいちばん目立たせるもの ---- */
+
+.wordmark {
+  font-size: var(--t-mark);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--ai-deep);
+  margin: 0 0 1.25rem;
+  text-decoration: none;
+}
+.wordmark::after {
+  /* 「済み」の印。カレンダーに付けるチェックの小さな丸 */
+  content: "";
+  display: inline-block;
+  width: 0.28em;
+  height: 0.28em;
+  margin-left: 0.08em;
+  border-radius: 50%;
+  background: var(--wakatake);
+  vertical-align: 0.08em;
+}
+.wordmark--small {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.nobr {
+  white-space: nowrap;
+}
+
+.lede {
+  font-size: var(--t-h2);
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+/* ---- ボタン ---- */
+
+.btn {
+  font: inherit;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem; /* 指で押せる大きさ */
+  padding: 0.5rem 1.125rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn--primary {
+  background: var(--ai);
+  border-color: var(--ai);
+  color: #fff;
+}
+.btn--primary:not(:disabled):hover {
+  background: var(--ai-deep);
+}
+.btn--large {
+  min-height: 3.5rem;
+  font-size: 1.125rem;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+.btn--quiet {
+  padding-inline: 0;
+  border-color: transparent;
+  background: none;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.btn--danger-quiet {
+  flex: none;
+  white-space: nowrap;
+  border-color: transparent;
+  background: none;
+  color: var(--danger);
+  min-height: 2.25rem;
+  padding-inline: 0.75rem;
+}
+
+/* ---- 文 ---- */
+
+.note,
+.muted {
+  color: var(--ink-soft);
+  font-size: var(--t-small);
+}
+.note {
+  margin-top: 2rem;
+}
+.error {
+  color: var(--danger);
+  font-weight: 500;
+}
+.notice {
+  border-left: 4px solid var(--ai);
+  padding: 0.5rem 0 0.5rem 0.875rem;
+  background: var(--surface);
+}
+.notice--ok {
+  border-left-color: var(--wakatake);
+}
+.done-mark {
+  font-size: var(--t-h2);
+  font-weight: 700;
+  color: var(--wakatake);
+}
+
+/* ---- 入力 ---- */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.stack > p {
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+  max-width: 24rem;
+  margin-bottom: 1rem;
+}
+.field > span {
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+}
+input,
+select {
+  font: inherit;
+  min-height: 2.75rem;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--ink);
+  width: 100%;
+}
+.row-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.row-form {
+  margin-bottom: 1.25rem;
+}
+.row-form .field {
+  flex: 1 1 14rem;
+  margin-bottom: 0;
+}
+
+/* ---- 設定の区切り ---- */
+
+.section {
+  padding-top: 1.5rem;
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+.list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.list__item:first-child {
+  border-top: 1px solid var(--line);
+}
+.list__title {
+  margin: 0;
+  font-weight: 500;
+}
+.list__meta {
+  margin: 0;
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+}
+.tag {
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-left: 0.5rem;
+  padding: 0.0625rem 0.5rem;
+  border-radius: 999px;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  vertical-align: 0.1em;
+}
+
+/* ---- 端末を追加 ---- */
+
+.dialog {
+  border: 0;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  width: min(26rem, calc(100vw - 2rem));
+  color: var(--ink);
+}
+.dialog::backdrop {
+  background: rgb(34 48 44 / 0.45);
+}
+.qr {
+  width: 240px;
+  height: 240px;
+  image-rendering: pixelated;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+.copy-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+.copy-row input {
+  font-size: var(--t-small);
+}
+.copy-row .btn {
+  flex: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

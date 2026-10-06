@@ -24,7 +24,7 @@ ID は ULID などのランダムな文字列。札・招待・セッション�
 |---|---|---|
 | id | text PK | credential id（base64url） |
 | user_id | text FK | |
-| public_key | blob | |
+| public_key | text | COSE 形式の公開鍵（base64url） |
 | counter | integer | 署名回数（複製の検出には使わない） |
 | transports | text | JSON 配列 |
 | name | text | 登録のときの名前（無ければ User-Agent から作る） |
@@ -62,6 +62,10 @@ ID は ULID などのランダムな文字列。札・招待・セッション�
 | expires_at | timestamp | 5分 |
 
 challenge の id は短命の Cookie（`__Host-kaji-chal`）で画面に持たせる。
+
+Cookie の名前：https の画面では `__Host-kaji-session`／`__Host-kaji-chal`。http の localhost（開発）では Secure を付けられないので `kaji-session`／`kaji-chal`。
+
+画面のオリジンは `ORIGINS`（カンマ区切り）で持ち、要求の Origin ヘッダがそのどれかと一致しなければ断る。パスキーの RP ID は一致したオリジンのホスト名。本番は `https://kaji.tjstkm.net` だけにする。開発では `.dev.vars` で localhost と banto の公開 URL を並べる。
 
 **rate_limits**
 | 列 | 型 | 説明 |
@@ -210,6 +214,7 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
 
 **ログイン**
 - `POST /auth/login/options`・`POST /auth/login/verify`：パスキーでログイン
+- `POST /auth/ticket-info`：札が使えるかと種類（最初の1人なら名前を聞くため）
 - `POST /auth/redeem`：札（`device` / `recovery` / `bootstrap`）を引き換える。`bootstrap` は表示名も受け取ってユーザーを作る
 - `POST /auth/register/options`・`POST /auth/register/verify`：ログイン中のユーザーにパスキーを足す（★、ただしパスキーが0個なら不要）
 - `POST /auth/step-up/options`・`POST /auth/step-up/verify`
@@ -247,8 +252,9 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
 ## 6. 最初の1人の作り方
 
 ```
-npm run bootstrap-link -- --remote   # 本番の D1 に札を入れて URL を出す
-npm run bootstrap-link               # ローカル
+npm run bootstrap-link -- --remote --origin https://kaji.tjstkm.net   # 本番の D1 に札を入れて URL を出す
+npm run bootstrap-link                                               # ローカル（http://localhost:5173）
+npm run bootstrap-link -- --origin https://dev-ae103b83.banto.tjstkm.net  # ローカルを banto の公開 URL で
 ```
 スクリプトがランダムな札を作り、ハッシュを `wrangler d1 execute` で `login_tickets` に入れ、`https://kaji.tjstkm.net/#login=<札>` を表示する。API からはこの札を作れない。
 

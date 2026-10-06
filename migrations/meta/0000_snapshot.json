@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7a29b697-e694-496a-b954-a74de88c98e4",
+  "id": "1b77bf4f-01af-4e64-a0d2-1648bb1976d4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "chores": {
@@ -84,16 +84,16 @@
           "notNull": false,
           "autoincrement": false
         },
-        "createdAt": {
-          "name": "createdAt",
+        "created_at": {
+          "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
         },
-        "updatedAt": {
-          "name": "updatedAt",
+        "updated_at": {
+          "name": "updated_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -172,8 +172,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "createdAt": {
-          "name": "createdAt",
+        "created_at": {
+          "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -211,8 +211,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "joinedAt": {
-          "name": "joinedAt",
+        "joined_at": {
+          "name": "joined_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -314,8 +314,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "createdAt": {
-          "name": "createdAt",
+        "created_at": {
+          "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -421,8 +421,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "createdAt": {
-          "name": "createdAt",
+        "created_at": {
+          "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -501,8 +501,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "createdAt": {
-          "name": "createdAt",
+        "created_at": {
+          "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -604,8 +604,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "sentAt": {
-          "name": "sentAt",
+        "sent_at": {
+          "name": "sent_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -674,7 +674,7 @@
         },
         "public_key": {
           "name": "public_key",
-          "type": "blob",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -701,8 +701,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "createdAt": {
-          "name": "createdAt",
+        "created_at": {
+          "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -790,8 +790,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "createdAt": {
-          "name": "createdAt",
+        "created_at": {
+          "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -926,16 +926,16 @@
           "notNull": false,
           "autoincrement": false
         },
-        "createdAt": {
-          "name": "createdAt",
+        "created_at": {
+          "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
         },
-        "lastUsedAt": {
-          "name": "lastUsedAt",
+        "last_used_at": {
+          "name": "last_used_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -1016,8 +1016,8 @@
           "autoincrement": false,
           "default": "'20:00'"
         },
-        "createdAt": {
-          "name": "createdAt",
+        "created_at": {
+          "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
