@@ -61,7 +61,7 @@
       "number": 3,
       "kind": "story",
       "title": "ログイン：パスキー・札・セッション",
-      "status": "in-progress",
+      "status": "done",
       "parent": null,
       "dependsOn": [
         "api-d1"
@@ -71,7 +71,7 @@
       "labels": [],
       "body": "docs/spec.md「アカウントとログイン」、docs/design.md の 1・5・6。banto の packages/core/src/auth/ を参考にする。",
       "doneWhen": "bootstrap の札で最初の1人を作り、パスキーでログイン・端末を追加・締め出し・step-up がテストと PC の localhost で確かめられる",
-      "resolution": null,
+      "resolution": "サーバ（src/worker/auth/）と画面（ログイン・札で入る・設定・端末を追加）。Workers のテスト 61 件通過（ログイン 22 件。テスト用のソフトウェアのパスキーで登録・ログイン・step-up まで）。本物の Chromium と仮想パスキーで、最初の1人 → パスキー作成 → 端末を追加（PC で入る・スマホに「入りました」）→ ログアウト → パスキーでログイン を npm run e2e で確認。commit efb83f7。回復の札（管理者が出す）は Family のストーリー #4 で作る。",
       "refs": [],
       "threads": [
         {
@@ -80,8 +80,8 @@
         }
       ],
       "createdAt": "2026-10-06T02:51:10.324Z",
-      "updatedAt": "2026-10-06T03:27:10.405Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-06T03:45:10.839Z",
+      "closedAt": "2026-10-06T03:45:10.839Z",
       "extra": {}
     },
     {
