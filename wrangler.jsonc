@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kajitracker",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kajitracker",
+      // 本番の D1 を作ったら、その id に置き換える（ローカルではこのままで動く）
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // 当日の通知：15分ごとに起こす（docs/design.md の 3）
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "vars": {
+    // パスキーの RP ID と画面のオリジン。本番は kaji.tjstkm.net に上書きする
+    "RP_ID": "localhost",
+    "ORIGIN": "http://localhost:5173"
+  },
+  "observability": { "enabled": true }
+}
