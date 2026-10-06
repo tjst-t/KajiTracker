@@ -117,7 +117,7 @@
       "number": 5,
       "kind": "story",
       "title": "家事と記録・今日の画面",
-      "status": "in-progress",
+      "status": "done",
       "parent": null,
       "dependsOn": [
         "interval-calendar",
@@ -128,7 +128,7 @@
       "labels": [],
       "body": "家事の登録・編集（S3・S4）、ワンタップ記録と取り消し・さかのぼり記録（S1・S2）。docs/design.md の 4。",
       "doneWhen": "スマホ幅で今日の画面の上に期限の来た家事が遅れ日数つきで出て、ワンタップで記録・取り消しでき、PC 幅で家事を登録・編集できる",
-      "resolution": null,
+      "resolution": "src/worker/chores/routes.ts と画面（今日＝当番表・家事の一覧・登録/編集・詳細）。Workers のテスト 93 件通過（家事と記録 12 件）。npm run e2e（login-flow ＋ chores-flow）で、家事の登録（日数・毎週・隔週＋最初の予定日）→ 今日の画面で遅れの札が先 → ワンタップで裏返り → 取り消し → 6秒後に並べ直し → 詳細でさかのぼり記録と統計 → PC の表から編集、を本物の Chromium で確認。",
       "refs": [],
       "threads": [
         {
@@ -137,8 +137,8 @@
         }
       ],
       "createdAt": "2026-10-06T02:51:10.567Z",
-      "updatedAt": "2026-10-06T05:14:43.131Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-06T05:27:36.684Z",
+      "closedAt": "2026-10-06T05:27:36.684Z",
       "extra": {}
     },
     {
