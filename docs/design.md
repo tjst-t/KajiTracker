@@ -127,6 +127,15 @@ PK は (key, window_start)。
 - 毎週・毎月（every=1）は、登録した日を anchor にする。
 - 隔週・nか月ごと（every≥2）は、登録画面で「最初の予定日」を選んでもらい、それを anchor にする。週・月の数え始めは anchor の週（日曜始まり）・月なので、登録した日を anchor にすると「その週の過ぎた日曜」が数え始めになり、最初の予定日が思ったより1回分先になることがあるため。
 
+**chore_groups**（家事のグループ）
+| 列 | 型 | 説明 |
+|---|---|---|
+| id | text PK | |
+| family_id | text FK | |
+| name | text | 例：キッチン |
+| sort_order | integer | 並び順 |
+Family を作ると「キッチン・風呂・トイレ・洗濯・ゴミ捨て・掃除」を入れる。chores.group_id がこれを指す（NULL ならグループなし。グループを消すと NULL に戻す）。
+
 **logs**
 | 列 | 型 | 説明 |
 |---|---|---|
@@ -245,6 +254,9 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
 - 周期の入力：`{type:"interval", intervalDays, firstDueOn}` か `{type:"calendar", rule}`。毎週・毎月は anchor を省くと登録した日（編集では前の基準日）。隔週・数か月ごとは anchor 必須で、規則に当たる日でなければ断る
 
 **統計**
+- `GET /families/:fid/groups`、`POST /families/:fid/groups`、`PATCH /groups/:id`（名前・並び順）、`DELETE /groups/:id`（家事はグループなしに）
+- `POST /families/:fid/chores/bulk`（まとめて登録。1行でも不備があれば1件も入れず、`rows: [{index, message}]` を返す。100件まで）
+
 - `GET /families/:fid/stats?from=&to=`
 
 **通知**

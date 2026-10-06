@@ -4,6 +4,8 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly code?: string,
+    /** エラーの本文そのもの（まとめて登録の行ごとの不備など） */
+    readonly detail?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -17,7 +19,7 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const json = (await res.json().catch(() => null)) as (T & { error?: string; code?: string }) | null;
-  if (!res.ok) throw new ApiError(res.status, json?.error ?? `うまくいきませんでした（${res.status}）`, json?.code);
+  if (!res.ok) throw new ApiError(res.status, json?.error ?? `うまくいきませんでした（${res.status}）`, json?.code, json ?? undefined);
   return json as T;
 }
 
@@ -41,3 +43,4 @@ export type SessionItem = {
 export type Role = "admin" | "member";
 export type Family = { id: string; name: string; role: Role };
 export type Member = { userId: string; displayName: string; role: Role; joinedAt: string; isMe: boolean };
+export type Group = { id: string; name: string; sortOrder: number };

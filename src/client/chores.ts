@@ -9,6 +9,8 @@ export type ChoreView = {
   schedule: Schedule;
   assigneeUserId: string | null;
   assigneeName: string | null;
+  groupId: string | null;
+  groupName: string | null;
   notifyTime: string | null;
   archived: boolean;
   dueOn: string | null;

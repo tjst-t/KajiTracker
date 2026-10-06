@@ -59,6 +59,7 @@ try {
   step = "add-interval";
   await addChore(phone, async () => {
     await phone.getByLabel("家事の名前").fill("ゴミ出し");
+    await phone.getByLabel("グループ").selectOption({ label: "ゴミ捨て" });
     await phone.getByLabel("何日ごと").fill("7");
     await phone.getByLabel("最初の期限").fill(jst(-3));
     await phone.getByText("もう 3日 過ぎています").waitFor();
@@ -100,6 +101,7 @@ try {
   if (fudaNames.join(",") !== "ゴミ出し,シーツ交換") throw new Error(`札の並びが違う: ${fudaNames}`);
   await phone.getByLabel("3日遅れ").waitFor();
   await phone.getByLabel("今日まで").waitFor();
+  await phone.locator(".fuda-wrap", { hasText: "ゴミ出し" }).locator(".fuda__group", { hasText: "ゴミ捨て" }).waitFor();
   await phone.getByText("換気扇の掃除").waitFor(); // 近いうち
   await phone.screenshot({ path: `${SHOTS}/13-today.png`, fullPage: true });
   ok("今日の画面：遅れ（3日遅れの判子）が先、今日のものが次。隔週は「近いうち」");
@@ -147,11 +149,68 @@ try {
   await h1(pcPage, "家事を編集");
   await pcPage.getByLabel("家事の名前").fill("シーツとまくらカバー");
   await pcPage.getByRole("button", { name: "保存する" }).click();
-  await h1(pcPage, "シーツとまくらカバー");
+  await h1(pcPage, "シーツとまくらカバー").catch(async (e) => {
+    console.log("画面:", (await pcPage.locator("main").innerText()).slice(0, 600));
+    throw e;
+  });
   ok("PC の一覧（表）から編集して保存");
+
+  // ---- まとめて登録：よくある家事から選ぶ＋手で1行（曜日で）＋不備の行 ----
+  step = "bulk";
+  await pcPage.getByRole("button", { name: "家事", exact: true }).click();
+  await pcPage.getByRole("button", { name: "まとめて登録" }).click();
+  await h1(pcPage, "まとめて登録");
+  await pcPage.getByRole("button", { name: "よくある家事から選ぶ" }).click();
+  await pcPage.getByRole("heading", { name: "よくある家事から選ぶ" }).waitFor();
+  await pcPage.screenshot({ path: `${SHOTS}/17-templates.png` });
+  // キッチンと風呂だけ残す
+  for (const box of await pcPage.locator(".templates fieldset").all()) {
+    const legend = await box.locator("legend").innerText();
+    if (!["キッチン", "風呂"].includes(legend)) for (const cb of await box.getByRole("checkbox").all()) await cb.uncheck();
+  }
+  await pcPage.getByRole("button", { name: "9件を表に足す" }).click();
+  // 手で1行：名前を入れ、曜日・日付で（毎月1日）
+  const n = 10;
+  await pcPage.getByLabel(`${n}行目の家事の名前`).fill("玄関マットを洗う");
+  await pcPage.getByLabel(`${n}行目のグループ`).selectOption({ label: "掃除" });
+  await pcPage.getByRole("button", { name: `${n}行目を曜日・日付で決める` }).click();
+  const dlg = pcPage.getByRole("dialog");
+  await dlg.getByLabel("決め方").selectOption("monthly_day");
+  await dlg.locator("label.field", { hasText: /^日付/ }).locator("select").selectOption("1");
+  await dlg.getByRole("button", { name: "決める" }).click();
+  await pcPage.getByRole("button", { name: `${n}行目の周期を変える` }).getByText("毎月 1日").waitFor();
+  // 不備：1行目の日数を0に
+  await pcPage.getByLabel("1行目の何日ごと", { exact: true }).fill("0");
+  await pcPage.screenshot({ path: `${SHOTS}/18-bulk.png`, fullPage: true });
+  await pcPage.getByRole("button", { name: "10件を登録" }).click();
+  await pcPage.getByText("1件の行に不備があります").waitFor();
+  await pcPage.locator(".row-note .error").first().waitFor();
+  await pcPage.getByLabel("1行目の何日ごと", { exact: true }).fill("7");
+  await pcPage.getByRole("button", { name: "10件を登録" }).click();
+  await pcPage.getByText("10件の家事を登録しました").waitFor();
+  ok("まとめて登録：よくある家事9件＋手で1件（毎月1日）、不備の行を直して10件登録");
+
+  // ---- 一覧：グループの見出しと絞り込み ----
+  step = "groups";
+  await pcPage.getByRole("heading", { level: 2, name: /^キッチン/ }).waitFor();
+  await pcPage.getByRole("heading", { level: 2, name: /^ゴミ捨て/ }).waitFor();
+  await pcPage.screenshot({ path: `${SHOTS}/19-chores-grouped.png`, fullPage: true });
+  await pcPage.getByLabel("グループで絞る").selectOption({ label: "風呂" });
+  const heads = await pcPage.locator(".group-heading").allInnerTexts();
+  if (heads.length !== 1 || !heads[0].startsWith("風呂")) throw new Error(`絞り込みが効いていない: ${heads}`);
+  await pcPage.getByLabel("グループで絞る").selectOption("");
+  // グループを足して名前を変える
+  await pcPage.getByText("グループを編集").click();
+  await pcPage.getByLabel("新しいグループ").fill("庭");
+  await pcPage.getByRole("button", { name: "足す" }).click();
+  await pcPage.getByText("グループを足しました").waitFor();
+  await pcPage.getByLabel("グループ「風呂」の名前").fill("お風呂");
+  await pcPage.locator(".group-row", { has: pcPage.getByLabel("グループ「風呂」の名前") }).getByRole("button", { name: "保存" }).click();
+  await pcPage.getByRole("heading", { level: 2, name: /^お風呂/ }).waitFor();
+  ok("一覧はグループごとの見出し、絞り込み、グループの追加と名前の変更");
 } catch (e) {
   console.log(`止まった場所: ${step}`);
-  errors.push(String(e).split("\n")[0]);
+  errors.push(String(e).split("\n").slice(0, 8).join("\n"));
 }
 
 await browser.close();

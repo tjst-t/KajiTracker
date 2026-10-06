@@ -49,6 +49,7 @@ export function Fuda(props: {
       <div className="fuda-inner">
         <article className={`fuda fuda--${chore.status}`} aria-hidden={!!done}>
           <div className="fuda__body">
+            {chore.groupName && <p className="fuda__group">{chore.groupName}</p>}
             <h3 className="fuda__name">
               <a
                 href={`/chores/${chore.id}`}

@@ -107,6 +107,18 @@ export const invites = sqliteTable("invites", {
 
 // ---- 家事と記録 ----
 
+export const choreGroups = sqliteTable(
+  "chore_groups",
+  {
+    id: text().primaryKey(),
+    familyId: text("family_id").notNull().references(() => families.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: now("created_at"),
+  },
+  (t) => [index("chore_groups_family").on(t.familyId)],
+);
+
 export const chores = sqliteTable(
   "chores",
   {
@@ -118,6 +130,7 @@ export const chores = sqliteTable(
     firstDueOn: text("first_due_on"),
     calendarRule: text("calendar_rule"), // JSON。形は src/shared/schedule.ts
     assigneeUserId: text("assignee_user_id").references(() => users.id, { onDelete: "set null" }),
+    groupId: text("group_id").references(() => choreGroups.id, { onDelete: "set null" }),
     notifyTime: text("notify_time"),
     archivedAt: text("archived_at"),
     createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),

@@ -19,6 +19,7 @@ export type Ctx = Context<AppEnv>;
 /** 画面に返すエラー。code は画面が分岐に使う */
 export function fail(status: ContentfulStatusCode, message: string, code?: string): never {
   throw new HTTPException(status, {
+    message,
     res: new Response(JSON.stringify({ error: message, code }), {
       status,
       headers: { "Content-Type": "application/json; charset=utf-8" },

@@ -2,6 +2,7 @@ import { lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { authRoutes } from "./auth/routes";
+import { groupRoutes } from "./chores/groups";
 import { choreRoutes } from "./chores/routes";
 import { familyRoutes } from "./families/routes";
 import { purgeExpiredSessions } from "./auth/session";
@@ -22,6 +23,7 @@ app.get("/health", async (c) => {
 
 app.route("/", authRoutes);
 app.route("/", familyRoutes);
+app.route("/", groupRoutes);
 app.route("/", choreRoutes);
 
 app.notFound((c) => c.json({ error: "その API はありません" }, 404));

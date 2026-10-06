@@ -198,6 +198,7 @@ function ChoreRows({ chores, today, nav }: { chores: ChoreView[]; today: string;
               </a>
             </p>
             <p className="list__meta">
+              {c.groupName ? `${c.groupName}、` : ""}
               {c.assigneeName ? `担当 ${c.assigneeName}、` : ""}
               {lastText(c.lastLog)}
             </p>

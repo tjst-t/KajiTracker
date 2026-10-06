@@ -6,11 +6,13 @@ import { RP, TICKET_TTL, body, requireStepUp, saveChallenge, takeChallengeRow, v
 import { createSession } from "../auth/session";
 import type { AppEnv, Ctx } from "../context";
 import { DAY, fail, isoAfter, nowIso, requireAuth } from "../context";
-import { chores, families, familyMembers, invites, loginTickets, passkeys, users } from "../db/schema";
+import { choreGroups, chores, families, familyMembers, invites, loginTickets, passkeys, users } from "../db/schema";
 import { rateLimit } from "../guards";
 import { base64urlToBytes, newId, randomToken, sha256Hex } from "../lib/crypto";
 
 const INVITE_TTL = DAY;
+/** Family を作ったときに最初からあるグループ */
+export const DEFAULT_GROUPS = ["キッチン", "風呂", "トイレ", "洗濯", "ゴミ捨て", "掃除"];
 type Role = "admin" | "member";
 
 const validFamilyName = (s: string | undefined): s is string => !!s && [...s].length >= 1 && [...s].length <= 30;
@@ -109,7 +111,11 @@ export const familyRoutes = new Hono<AppEnv>()
     if (!validFamilyName(n)) fail(400, "Family の名前を1〜30文字で入れてください");
     const id = newId();
     const db = c.get("db");
-    await db.batch([db.insert(families).values({ id, name: n }), db.insert(familyMembers).values({ familyId: id, userId: user.id, role: "admin" })]);
+    await db.batch([
+      db.insert(families).values({ id, name: n }),
+      db.insert(familyMembers).values({ familyId: id, userId: user.id, role: "admin" }),
+      db.insert(choreGroups).values(DEFAULT_GROUPS.map((name, i) => ({ id: newId(), familyId: id, name, sortOrder: i }))),
+    ]);
     return c.json({ id, name: n, role: "admin" as Role }, 201);
   })
   .patch("/families/:fid", async (c) => {

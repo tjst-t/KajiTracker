@@ -15,6 +15,13 @@
       "when": 1791259041293,
       "tag": "0001_challenge_data",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791295888259,
+      "tag": "0002_chore_groups",
+      "breakpoints": true
     }
   ]
 }

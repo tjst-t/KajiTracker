@@ -3,6 +3,7 @@ export type Route =
   | { name: "today" }
   | { name: "chores" }
   | { name: "chore-new" }
+  | { name: "chore-bulk" }
   | { name: "chore"; id: string }
   | { name: "chore-edit"; id: string }
   | { name: "family" }
@@ -18,6 +19,8 @@ export function pathOf(r: Route): string {
       return "/chores";
     case "chore-new":
       return "/chores/new";
+    case "chore-bulk":
+      return "/chores/bulk";
     case "chore":
       return `/chores/${r.id}`;
     case "chore-edit":
@@ -32,6 +35,7 @@ export function pathOf(r: Route): string {
 export function routeOf(path: string): Route {
   let m: RegExpExecArray | null;
   if (path === "/chores/new") return { name: "chore-new" };
+  if (path === "/chores/bulk") return { name: "chore-bulk" };
   if ((m = /^\/chores\/([^/]+)\/edit$/.exec(path))) return { name: "chore-edit", id: m[1]! };
   if ((m = /^\/chores\/([^/]+)$/.exec(path))) return { name: "chore", id: m[1]! };
   if (path.startsWith("/chores")) return { name: "chores" };

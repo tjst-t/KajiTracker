@@ -1,11 +1,13 @@
 // 家事と記録。仕様は docs/spec.md「家事」「記録」、期限の計算は src/shared/schedule.ts。
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { body } from "../auth/routes";
 import { validNotifyTime } from "../auth/routes";
 import type { AppEnv, Ctx } from "../context";
 import { fail, nowIso, requireAuth } from "../context";
-import { chores, familyMembers, logs, users } from "../db/schema";
+import { choreGroups, chores, familyMembers, logs, users } from "../db/schema";
+import { validGroup } from "./groups";
 import { requireMember } from "../families/routes";
 import { newId } from "../lib/crypto";
 import { type DateStr, diffDays, isDateStr, todayInTokyo, toDayNum } from "../../shared/date";
@@ -107,7 +109,7 @@ async function logsByChore(c: Ctx, choreIds: string[]): Promise<Map<string, LogV
   return map;
 }
 
-function view(chore: ChoreRow, assigneeName: string | null, choreLogs: LogView[], today: DateStr) {
+function view(chore: ChoreRow, assigneeName: string | null, groupName: string | null, choreLogs: LogView[], today: DateStr) {
   const schedule = scheduleOf(chore);
   const ev = evaluate(schedule, choreLogs.map((l) => l.doneOn), today);
   return {
@@ -117,6 +119,8 @@ function view(chore: ChoreRow, assigneeName: string | null, choreLogs: LogView[]
     schedule,
     assigneeUserId: chore.assigneeUserId,
     assigneeName,
+    groupId: chore.groupId,
+    groupName,
     notifyTime: chore.notifyTime,
     archived: !!chore.archivedAt,
     dueOn: ev.dueOn,
@@ -146,6 +150,37 @@ export function choreStats(schedule: Schedule, ev: Evaluation, doneOns: DateStr[
   };
 }
 
+/** 家事1つを、担当とグループの名前つきで引く */
+async function loadNamed(c: Ctx, id: string) {
+  const r = await c
+    .get("db")
+    .select({ chore: chores, assigneeName: users.displayName, groupName: choreGroups.name })
+    .from(chores)
+    .leftJoin(users, eq(chores.assigneeUserId, users.id))
+    .leftJoin(choreGroups, eq(chores.groupId, choreGroups.id))
+    .where(eq(chores.id, id))
+    .get();
+  return r!;
+}
+
+type ChoreInput = { name: unknown; schedule: unknown; assigneeUserId: unknown; groupId: unknown; notifyTime: unknown };
+
+/** 画面から来た1つの家事を確かめ、chores に入れる行にする（まだ入れない） */
+async function buildChoreRow(c: Ctx, fid: string, userId: string, b: Partial<ChoreInput>, today: DateStr) {
+  return {
+    id: newId(),
+    familyId: fid,
+    name: validName(b.name),
+    ...scheduleColumns(b.schedule, today),
+    assigneeUserId: await validAssignee(c, fid, b.assigneeUserId),
+    groupId: await validGroup(c, fid, b.groupId),
+    notifyTime: validChoreNotify(b.notifyTime),
+    createdBy: userId,
+  };
+}
+
+const BULK_MAX = 100;
+
 const strip = <T extends { _ev: unknown }>(v: T) => {
   const { _ev, ...rest } = v;
   return rest;
@@ -158,9 +193,10 @@ export const choreRoutes = new Hono<AppEnv>()
     const includeArchived = c.req.query("archived") === "1";
     const db = c.get("db");
     const rows = await db
-      .select({ chore: chores, assigneeName: users.displayName })
+      .select({ chore: chores, assigneeName: users.displayName, groupName: choreGroups.name })
       .from(chores)
       .leftJoin(users, eq(chores.assigneeUserId, users.id))
+      .leftJoin(choreGroups, eq(chores.groupId, choreGroups.id))
       .where(includeArchived ? eq(chores.familyId, fid) : and(eq(chores.familyId, fid), isNull(chores.archivedAt)))
       .all();
     const byChore = await logsByChore(
@@ -168,37 +204,48 @@ export const choreRoutes = new Hono<AppEnv>()
       rows.map((r) => r.chore.id),
     );
     const today = todayInTokyo();
-    return c.json({ today, chores: rows.map((r) => strip(view(r.chore, r.assigneeName, byChore.get(r.chore.id) ?? [], today))) });
+    return c.json({ today, chores: rows.map((r) => strip(view(r.chore, r.assigneeName, r.groupName, byChore.get(r.chore.id) ?? [], today))) });
   })
   .post("/families/:fid/chores", async (c) => {
     const fid = c.req.param("fid");
     const { userId } = await requireMember(c, fid);
-    const b = await body<{ name: string; schedule: unknown; assigneeUserId: string | null; notifyTime: string | null }>(c);
+    const b = await body<ChoreInput>(c);
     const today = todayInTokyo();
-    const row = {
-      id: newId(),
-      familyId: fid,
-      name: validName(b.name),
-      ...scheduleColumns(b.schedule, today),
-      assigneeUserId: await validAssignee(c, fid, b.assigneeUserId),
-      notifyTime: validChoreNotify(b.notifyTime),
-      createdBy: userId,
-    };
+    const row = await buildChoreRow(c, fid, userId, b, today);
     await c.get("db").insert(chores).values(row);
-    const created = (await c.get("db").select().from(chores).where(eq(chores.id, row.id)).get())!;
-    const assigneeName = row.assigneeUserId
-      ? ((await c.get("db").select({ n: users.displayName }).from(users).where(eq(users.id, row.assigneeUserId)).get())?.n ?? null)
-      : null;
-    return c.json(strip(view(created, assigneeName, [], today)), 201);
+    const r = await loadNamed(c, row.id);
+    return c.json(strip(view(r.chore, r.assigneeName, r.groupName, [], today)), 201);
+  })
+  /** まとめて登録。1行でも不備があれば1つも入れず、不備のある行を返す */
+  .post("/families/:fid/chores/bulk", async (c) => {
+    const fid = c.req.param("fid");
+    const { userId } = await requireMember(c, fid);
+    const { chores: input } = await body<{ chores: Partial<ChoreInput>[] }>(c);
+    if (!Array.isArray(input) || input.length === 0) fail(400, "登録する家事がありません");
+    if (input.length > BULK_MAX) fail(400, `一度に登録できるのは ${BULK_MAX} 件までです`);
+    const today = todayInTokyo();
+    const rows: Awaited<ReturnType<typeof buildChoreRow>>[] = [];
+    const errors: { index: number; message: string }[] = [];
+    for (const [index, b] of input.entries()) {
+      try {
+        rows.push(await buildChoreRow(c, fid, userId, b ?? {}, today));
+      } catch (e) {
+        if (!(e instanceof HTTPException)) throw e;
+        errors.push({ index, message: e.message });
+      }
+    }
+    if (errors.length) return c.json({ error: `${errors.length}件の行に不備があります`, code: "bulk_invalid", rows: errors }, 400);
+    const db = c.get("db");
+    const [first, ...more] = rows.map((r) => db.insert(chores).values(r));
+    await db.batch([first!, ...more]);
+    return c.json({ created: rows.length, ids: rows.map((r) => r.id) }, 201);
   })
   .get("/chores/:id", async (c) => {
     const chore = await loadChore(c, c.req.param("id"));
-    const assigneeName = chore.assigneeUserId
-      ? ((await c.get("db").select({ n: users.displayName }).from(users).where(eq(users.id, chore.assigneeUserId)).get())?.n ?? null)
-      : null;
+    const { assigneeName, groupName } = await loadNamed(c, chore.id);
     const choreLogs = (await logsByChore(c, [chore.id])).get(chore.id) ?? [];
     const today = todayInTokyo();
-    const v = view(chore, assigneeName, choreLogs, today);
+    const v = view(chore, assigneeName, groupName, choreLogs, today);
     return c.json({
       ...strip(v),
       logs: choreLogs,
@@ -209,11 +256,12 @@ export const choreRoutes = new Hono<AppEnv>()
   })
   .patch("/chores/:id", async (c) => {
     const chore = await loadChore(c, c.req.param("id"));
-    const b = await body<{ name: string; schedule: unknown; assigneeUserId: string | null; notifyTime: string | null; archived: boolean }>(c);
+    const b = await body<ChoreInput & { archived: boolean }>(c);
     const set: Partial<typeof chores.$inferInsert> = { updatedAt: nowIso() };
     if (b.name !== undefined) set.name = validName(b.name);
     if (b.schedule !== undefined) Object.assign(set, scheduleColumns(b.schedule, todayInTokyo(), chore));
     if (b.assigneeUserId !== undefined) set.assigneeUserId = await validAssignee(c, chore.familyId, b.assigneeUserId);
+    if (b.groupId !== undefined) set.groupId = await validGroup(c, chore.familyId, b.groupId);
     if (b.notifyTime !== undefined) set.notifyTime = validChoreNotify(b.notifyTime);
     if (b.archived !== undefined) set.archivedAt = b.archived ? nowIso() : null;
     await c.get("db").update(chores).set(set).where(eq(chores.id, chore.id));

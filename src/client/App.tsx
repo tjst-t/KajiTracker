@@ -7,6 +7,7 @@ import { FamilyScreen } from "./screens/FamilyScreen";
 import { InviteScreen } from "./screens/Invite";
 import { Login } from "./screens/Login";
 import { Settings } from "./screens/Settings";
+import { ChoreBulk } from "./screens/ChoreBulk";
 import { ChoreDetail } from "./screens/ChoreDetail";
 import { ChoreForm } from "./screens/ChoreForm";
 import { Chores } from "./screens/Chores";
@@ -168,6 +169,8 @@ export function App() {
         <FamilyScreen me={me} family={family} onFamiliesChanged={loadFamilies} />
       ) : route.name === "chores" ? (
         <Chores family={family} nav={nav} />
+      ) : route.name === "chore-bulk" ? (
+        <ChoreBulk family={family} nav={nav} />
       ) : route.name === "chore-new" ? (
         <ChoreForm family={family} nav={nav} />
       ) : route.name === "chore-edit" ? (
