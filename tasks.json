@@ -22,6 +22,27 @@
       "updatedAt": "2026-10-06T02:51:07.862Z",
       "closedAt": null,
       "extra": {}
+    },
+    {
+      "id": "interval-calendar",
+      "number": 2,
+      "kind": "story",
+      "title": "期限の計算（interval と calendar）",
+      "status": "ready",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "high",
+      "labels": [],
+      "body": "src/shared/schedule.ts の純粋な関数。docs/design.md の 2。カレンダーの前倒しの扱いはたくみさんに確認中。",
+      "doneWhen": "spec の全パターン（毎週複数曜日・隔週・第n曜日・最終曜日・毎月○日・月末・nか月ごと・打ち切り・遅れ日数）をテストが通る",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-06T02:51:10.204Z",
+      "updatedAt": "2026-10-06T02:51:10.204Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
