@@ -89,7 +89,7 @@
       "number": 4,
       "kind": "story",
       "title": "Family と招待（QR）・回復の札",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [
         "item-1"
@@ -101,9 +101,14 @@
       "doneWhen": "Family の作成・切り替え、招待 QR から新規登録して参加、役割の変更、抜ける・外す・削除、管理者による回復の札がテストで通る",
       "resolution": null,
       "refs": [],
-      "threads": [],
+      "threads": [
+        {
+          "projectId": "ae103b83-45a2-4ce2-9171-88a72857b841",
+          "threadId": "0bf4949a-52fb-42bd-b5ed-08fbbd34d99a"
+        }
+      ],
       "createdAt": "2026-10-06T02:51:10.444Z",
-      "updatedAt": "2026-10-06T02:51:25.968Z",
+      "updatedAt": "2026-10-06T03:57:17.981Z",
       "closedAt": null,
       "extra": {}
     },
