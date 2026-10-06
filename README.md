@@ -13,7 +13,7 @@ npm run db:migrate:local   # ローカルの D1 にマイグレーションを�
 npm run dev                # http://localhost:5173 （/api/health で API を確かめられる）
 npm test                   # Workers のランタイムでテスト
 npm run bootstrap-link     # 最初の1人のためのログインの札（10分・1回）を出す
-npm run db:reset:local     # ローカルの D1 を空に戻す（ログイン情報はバックアップして復元する）
+npm run db:reset:local     # ローカルの D1 を空に戻す（ログイン情報と Family はバックアップして復元する）
 npm run e2e                # 本物のブラウザ（Chromium）と仮想パスキーでログインの流れを通す
 ```
 
