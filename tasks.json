@@ -233,6 +233,29 @@
       "updatedAt": "2026-10-06T02:51:32.166Z",
       "closedAt": null,
       "extra": {}
+    },
+    {
+      "id": "item-4",
+      "number": 10,
+      "kind": "story",
+      "title": "家事のグループと、表でまとめて登録",
+      "status": "backlog",
+      "parent": null,
+      "dependsOn": [
+        "item-2"
+      ],
+      "milestone": null,
+      "priority": "high",
+      "labels": [],
+      "body": "たくみさんの要望（2026-10-06）。家事をキッチン・風呂・ゴミ捨てなどのグループに分ける。表のような画面で家事をまとめて登録する。仕様は確認中。",
+      "doneWhen": "グループを作って家事に付けられ、一覧と今日の画面でグループが分かる。表の画面で複数の家事を一度に登録でき、e2e で確認できる",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-06T14:07:41.618Z",
+      "updatedAt": "2026-10-06T14:07:41.618Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
