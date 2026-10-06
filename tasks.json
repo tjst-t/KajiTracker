@@ -127,6 +127,27 @@
       "updatedAt": "2026-10-06T02:51:10.678Z",
       "closedAt": null,
       "extra": {}
+    },
+    {
+      "id": "item-3",
+      "number": 7,
+      "kind": "story",
+      "title": "統計",
+      "status": "ready",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "normal",
+      "labels": [],
+      "body": "docs/spec.md「統計」、docs/design.md の S2・S5。",
+      "doneWhen": "分担・偏り・守れた率・平均の遅れ・推移・ランキング・家事ごとの平均間隔が、テスト用のデータで期待どおりの値になり画面に出る",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-06T02:51:10.821Z",
+      "updatedAt": "2026-10-06T02:51:10.821Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
