@@ -53,7 +53,9 @@
       "title": "ログイン：パスキー・札・セッション",
       "status": "ready",
       "parent": null,
-      "dependsOn": [],
+      "dependsOn": [
+        "api-d1"
+      ],
       "milestone": null,
       "priority": "high",
       "labels": [],
@@ -63,7 +65,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-06T02:51:10.324Z",
-      "updatedAt": "2026-10-06T02:51:10.324Z",
+      "updatedAt": "2026-10-06T02:51:24.772Z",
       "closedAt": null,
       "extra": {}
     },
