@@ -259,7 +259,7 @@
       "number": 14,
       "kind": "task",
       "title": "統計1：統計の計算と API",
-      "status": "ready",
+      "status": "in-progress",
       "parent": "item-3",
       "dependsOn": [],
       "milestone": null,
@@ -271,7 +271,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-07T15:30:51.183Z",
-      "updatedAt": "2026-10-07T15:30:51.183Z",
+      "updatedAt": "2026-10-07T23:46:42.359Z",
       "closedAt": null,
       "extra": {}
     },
