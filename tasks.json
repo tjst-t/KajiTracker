@@ -280,7 +280,7 @@
       "number": 15,
       "kind": "task",
       "title": "統計2：統計の画面と、家事の詳細の実施カレンダー",
-      "status": "ready",
+      "status": "in-progress",
       "parent": "item-3",
       "dependsOn": [
         "stats-api"
@@ -294,7 +294,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-07T15:30:51.183Z",
-      "updatedAt": "2026-10-07T15:30:51.183Z",
+      "updatedAt": "2026-10-07T23:54:02.638Z",
       "closedAt": null,
       "extra": {}
     },
