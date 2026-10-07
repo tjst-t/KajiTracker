@@ -9,7 +9,13 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
-          bindings: { TEST_MIGRATIONS: migrations },
+          bindings: {
+            TEST_MIGRATIONS: migrations,
+            // テスト専用の VAPID 鍵（npm run vapid:generate で作ったもの。本番では使わない）
+            VAPID_PUBLIC_KEY: "BBbgOno4cSW24D75HZYrZK1PvwZCP1cJMp-_CweutEubGD0yAwkeLInZagCCm8nKTkfQ4ND8wh1x93ek9ULXIt0",
+            VAPID_PRIVATE_KEY: "EEM21FQ9yJE-Uc915Lk5sVBYZbu1efwyDuzMFZFetzs",
+            VAPID_SUBJECT: "mailto:test@example.com",
+          },
         },
       }),
     ],

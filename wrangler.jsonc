@@ -24,5 +24,7 @@
     // 本番は "https://kaji.tjstkm.net" だけにする。開発で公開 URL を足すときは .dev.vars で上書きする
     "ORIGINS": "http://localhost:5173"
   },
+  // Web Push の鍵。ローカルは .dev.vars、本番は wrangler secret put で入れる（README）
+  "secrets": { "required": ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"] },
   "observability": { "enabled": true }
 }

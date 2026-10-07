@@ -5,6 +5,7 @@ import { authRoutes } from "./auth/routes";
 import { groupRoutes } from "./chores/groups";
 import { choreRoutes } from "./chores/routes";
 import { familyRoutes } from "./families/routes";
+import { pushRoutes } from "./push/routes";
 import { purgeExpiredSessions } from "./auth/session";
 import { statsRoutes } from "./stats/routes";
 import { DAY, isoBefore, nowIso } from "./context";
@@ -27,6 +28,7 @@ app.route("/", familyRoutes);
 app.route("/", groupRoutes);
 app.route("/", choreRoutes);
 app.route("/", statsRoutes);
+app.route("/", pushRoutes);
 
 app.notFound((c) => c.json({ error: "その API はありません" }, 404));
 app.onError((err, c) => {
