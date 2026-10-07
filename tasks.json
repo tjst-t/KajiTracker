@@ -169,7 +169,7 @@
       "number": 11,
       "kind": "task",
       "title": "通知1：Web Push の送信の土台と購読の API",
-      "status": "ready",
+      "status": "in-progress",
       "parent": "web-push-cron",
       "dependsOn": [],
       "milestone": null,
@@ -181,7 +181,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-07T15:30:48.884Z",
-      "updatedAt": "2026-10-07T15:30:48.884Z",
+      "updatedAt": "2026-10-07T23:46:41.834Z",
       "closedAt": null,
       "extra": {}
     },
