@@ -257,7 +257,25 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
 - `POST /families/:fid/chores/bulk`（まとめて登録。1行でも不備があれば1件も入れず、`rows: [{index, message}]` を返す。100件まで）
 
 **統計**
-- `GET /families/:fid/stats?from=&to=`
+- `GET /families/:fid/stats?from=&to=`（日本時間の日付、両端を含む。省いた側は今月の初日・末日）。計算は `src/shared/stats.ts`
+  - 取り消した記録は数えない。しまった家事は含める（期限の計算は、しまった日で打ち切る）
+  - 守り具合は、期間内に期限がある「回」（2 の統計用の「回」）で数える。家事の詳細の統計と同じ数え方。いま開いている回は数えない
+
+```
+{
+  today, from, to,
+  totalCount,                                   // 期間内の記録の数
+  people: [{ userId, name, isMember, count, share }],  // 分担。メンバー（入った順）＋記録のある抜けた人。share は %（整数）
+  byChore: [{ choreId, name, archived, count, byUser: [{ userId, count }] }],  // 担当の偏り。記録のある家事だけ、多い順
+  punctuality: { judgedCount, onTimeCount, onTimeRate, averageDaysLate, missedCount },
+      // onTimeRate は期限内の回 ÷（できた回＋missed）の %。averageDaysLate はできた回の平均（小数1桁）。回が無ければ null
+  weekly: [{ weekStart, count }],               // 月曜始まり。weekStart は月曜の日付
+  monthly: [{ month: "YYYY-MM", count }],
+      // 推移は from と「いちばん古い記録・期限」の遅いほうから to まで、0 の週・月も並べる
+  lateRanking: [{ choreId, name, archived, score, ...punctuality と同じ項目 }],
+      // score ＝ 平均の遅れ日数 ＋ missed の回数。0 より大きいものを多い順に上位10
+}
+```
 
 **通知**
 - `GET /push/vapid-public-key`
