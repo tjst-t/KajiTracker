@@ -395,6 +395,27 @@
       "updatedAt": "2026-10-06T14:31:23.800Z",
       "closedAt": "2026-10-06T14:31:23.800Z",
       "extra": {}
+    },
+    {
+      "id": "stats-range-limit",
+      "number": 17,
+      "kind": "bug",
+      "title": "統計の期間に上限がなく、範囲外の週・月が出る",
+      "status": "ready",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "normal",
+      "labels": [],
+      "body": "stats-api のレビューの指摘（取り込みは済み）。\n1. GET /api/families/:fid/stats の to に上限が無い。src/shared/stats.ts の computeStats は推移を作るときに start から end まで1日ずつ回すので、to=9999-12-31 のような日付で Worker の CPU と応答の大きさを超えかねない。from・to を日付として確かめ、to は今日（日本時間）までに丸める、期間は最大 3 年など上限を付けて、超えたら 400（src/worker/context.ts の fail）。\n2. 期間が最初の記録・期限より前で終わるとき（from=2000-01-01・to=2000-12-31 など）、start が最初の記録の日になり end=max(start,to) になるため、期間の外の週と月が 0 件で返る。start を min(max(first, from), to) にするなどで、期間の外を返さない。\nテスト（src/**/*.test.ts、npm test）で両方を確かめる。ローカルの D1 を消さない。",
+      "doneWhen": "極端な to が 400 か丸められ、期間外の週・月が返らないことをテストで確かめ、npm test・tsc・build が通る",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-07T23:53:58.888Z",
+      "updatedAt": "2026-10-07T23:53:58.888Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
