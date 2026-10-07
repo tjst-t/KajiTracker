@@ -213,7 +213,7 @@
       "number": 13,
       "kind": "task",
       "title": "通知3：Service Worker と「この端末で通知を受ける」の画面",
-      "status": "ready",
+      "status": "in-progress",
       "parent": "web-push-cron",
       "dependsOn": [
         "push-foundation"
@@ -227,7 +227,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-07T15:30:48.884Z",
-      "updatedAt": "2026-10-07T15:30:48.884Z",
+      "updatedAt": "2026-10-07T23:54:02.117Z",
       "closedAt": null,
       "extra": {}
     },
