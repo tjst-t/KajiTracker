@@ -190,7 +190,7 @@
       "number": 12,
       "kind": "task",
       "title": "通知2：Cron で当日の家事を送り分ける",
-      "status": "ready",
+      "status": "in-progress",
       "parent": "web-push-cron",
       "dependsOn": [
         "push-foundation"
@@ -204,7 +204,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-07T15:30:48.884Z",
-      "updatedAt": "2026-10-07T15:30:48.884Z",
+      "updatedAt": "2026-10-07T23:54:01.563Z",
       "closedAt": null,
       "extra": {}
     },
