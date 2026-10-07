@@ -5,6 +5,7 @@ import { authRoutes } from "./auth/routes";
 import { groupRoutes } from "./chores/groups";
 import { choreRoutes } from "./chores/routes";
 import { familyRoutes } from "./families/routes";
+import { sendDueNotifications } from "./push/notify";
 import { pushRoutes } from "./push/routes";
 import { purgeExpiredSessions } from "./auth/session";
 import { statsRoutes } from "./stats/routes";
@@ -48,8 +49,9 @@ export async function purge(env: Env) {
 
 export default {
   fetch: app.fetch,
-  async scheduled(_controller, env, ctx) {
+  async scheduled(controller, env, ctx) {
     ctx.waitUntil(purge(env));
-    // 当日の通知（docs/design.md の 3）は「通知：Web Push と Cron」で足す
+    // 当日の通知（docs/design.md の 3）。時刻帯は Cron の予定時刻で決める
+    ctx.waitUntil(sendDueNotifications(env, new Date(controller.scheduledTime)));
   },
 } satisfies ExportedHandler<Env>;
