@@ -126,7 +126,7 @@ describe("記録", () => {
   });
 });
 
-describe("編集・しまう・消す", () => {
+describe("編集・無効にする・消す", () => {
   it("名前・周期・担当・通知の時刻を変えられる。担当を外すと null", async () => {
     const { takumi, wife, fam } = await family();
     const chore = (await takumi.post(`/api/families/${fam.id}/chores`, { name: "ゴミ出し", schedule: interval(7, today()), assigneeUserId: wife.userId })).json;
@@ -142,7 +142,7 @@ describe("編集・しまう・消す", () => {
     });
   });
 
-  it("しまった家事は一覧から外れ（archived=1 で出る）、戻せる", async () => {
+  it("無効の家事は一覧から外れ（archived=1 で出る）、戻せる", async () => {
     const { takumi, fam } = await family();
     const chore = (await takumi.post(`/api/families/${fam.id}/chores`, { name: "こたつ布団", schedule: interval(180, today()) })).json;
     await takumi.patch(`/api/chores/${chore.id}`, { archived: true });

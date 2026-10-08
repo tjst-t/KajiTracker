@@ -269,21 +269,28 @@ export const choreRoutes = new Hono<AppEnv>()
     await db.batch([first!, ...more]);
     return c.json({ created: rows.length, ids: rows.map((r) => r.id) }, 201);
   })
-  /** まとめて直す。1行でも不備があれば1つも変えず、不備のある行を返す（POST の bulk と同じ形） */
+  /**
+   * まとめて直す・消す。1行でも不備があれば1つも変えず・消さず、不備のある行を返す（POST の bulk と同じ形。
+   * 消す側の不備は kind: "delete" を付け、index は deleteIds の中の位置）。変更と削除は1つの batch で行う
+   */
   .patch("/families/:fid/chores/bulk", async (c) => {
     const fid = c.req.param("fid");
     await requireMember(c, fid);
-    const { chores: input } = await body<{ chores: (ChorePatch & { id?: unknown })[] }>(c);
-    if (!Array.isArray(input) || input.length === 0) fail(400, "直す家事がありません");
-    if (input.length > BULK_EDIT_MAX) fail(400, `一度に直せるのは ${BULK_EDIT_MAX} 件までです`);
+    const { chores: rawInput, deleteIds: rawDelete } = await body<{ chores?: (ChorePatch & { id?: unknown })[]; deleteIds?: unknown[] }>(c);
+    if (rawInput !== undefined && !Array.isArray(rawInput)) fail(400, "直す家事が正しくありません");
+    if (rawDelete !== undefined && !Array.isArray(rawDelete)) fail(400, "消す家事が正しくありません");
+    const input = rawInput ?? [];
+    const deleteIds = rawDelete ?? [];
+    if (input.length === 0 && deleteIds.length === 0) fail(400, "直す家事がありません");
+    if (input.length + deleteIds.length > BULK_EDIT_MAX) fail(400, `一度に直せる・消せるのは合わせて ${BULK_EDIT_MAX} 件までです`);
     const db = c.get("db");
-    const ids = [...new Set(input.map((b) => b?.id).filter((id): id is string => typeof id === "string"))];
+    const ids = [...new Set([...input.map((b) => b?.id), ...deleteIds].filter((id): id is string => typeof id === "string"))];
     const found = ids.length ? await db.select().from(chores).where(and(eq(chores.familyId, fid), inArray(chores.id, ids))).all() : [];
     const byId = new Map(found.map((r) => [r.id, r]));
     const refs = await familyRefs(c, fid);
     const today = todayInTokyo();
     const updates: { id: string; set: Awaited<ReturnType<typeof buildChorePatch>> }[] = [];
-    const errors: { index: number; message: string }[] = [];
+    const errors: { index: number; message: string; kind?: "delete" }[] = [];
     const seen = new Set<string>();
     for (const [index, b] of input.entries()) {
       try {
@@ -298,10 +305,22 @@ export const choreRoutes = new Hono<AppEnv>()
         errors.push({ index, message: e.message });
       }
     }
+    const deletes: string[] = [];
+    for (const [index, id] of deleteIds.entries()) {
+      const chore = typeof id === "string" ? byId.get(id) : undefined;
+      if (!chore) errors.push({ index, message: "その家事はありません", kind: "delete" });
+      else if (deletes.includes(chore.id)) errors.push({ index, message: "同じ家事が2回あります", kind: "delete" });
+      else if (seen.has(chore.id)) errors.push({ index, message: "同じ家事を直すのと消すのを一度にはできません", kind: "delete" });
+      else deletes.push(chore.id);
+    }
     if (errors.length) return c.json({ error: `${errors.length}件の行に不備があります`, code: "bulk_invalid", rows: errors }, 400);
-    const [first, ...more] = updates.map((u) => db.update(chores).set(u.set).where(eq(chores.id, u.id)));
+    const [first, ...more] = [
+      ...updates.map((u) => db.update(chores).set(u.set).where(eq(chores.id, u.id))),
+      // 記録も cascade で消える（DELETE /chores/:id と同じ）
+      ...(deletes.length ? [db.delete(chores).where(and(eq(chores.familyId, fid), inArray(chores.id, deletes)))] : []),
+    ];
     await db.batch([first!, ...more]);
-    return c.json({ updated: updates.length });
+    return c.json({ updated: updates.length, deleted: deletes.length });
   })
   .get("/chores/:id", async (c) => {
     const chore = await loadChore(c, c.req.param("id"));

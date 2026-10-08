@@ -1,6 +1,6 @@
 // まとめて登録の表（PC 幅）を本物のブラウザで通す：貼り付け・範囲に同じ値・角を引っぱって埋める・読めない周期の赤・
 // 日付のカレンダー・周期の選ぶ画面・登録。スマホ幅では1行ずつの画面のまま。
-// 表で直す：担当の列を範囲選択でまとめて同じ人にして保存する・保存しないで離れようとすると確かめる。
+// 表で直す：担当の列を範囲選択でまとめて同じ人にして保存する・保存しないで離れようとすると確かめる・「削除」にチェックして確かめのうえ消す。
 // 開発サーバを起こしてから `npm run e2e`（別のポートなら E2E_ORIGIN=http://localhost:5191 node e2e/bulk-grid-flow.mjs）。
 import { execSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
@@ -245,17 +245,17 @@ try {
   await h1(page, "表で直す");
   await expectText(2, "assignee", "たくみ");
 
-  // しまうのマスは押すと入り切りし、Ctrl+Z で戻る
+  // 無効のマスは押すと入り切りし、Ctrl+Z で戻る
   await cell(3, "archived").click();
-  if (!(await cell(3, "archived").locator("input").isChecked())) throw new Error("しまうのマスを押してもチェックが入らない");
+  if (!(await cell(3, "archived").locator("input").isChecked())) throw new Error("無効のマスを押してもチェックが入らない");
   await page.getByRole("button", { name: "3件の変更を保存" }).waitFor();
   await page.keyboard.press("ControlOrMeta+z");
-  if (await cell(3, "archived").locator("input").isChecked()) throw new Error("Ctrl+Z でしまうが戻らない");
+  if (await cell(3, "archived").locator("input").isChecked()) throw new Error("Ctrl+Z で無効が戻らない");
   // 選んであるマスをもう一度押しても1回だけ変わる
   await cell(3, "archived").click();
-  if (!(await cell(3, "archived").locator("input").isChecked())) throw new Error("選んであるしまうのマスを押すと2回変わる");
+  if (!(await cell(3, "archived").locator("input").isChecked())) throw new Error("選んである無効のマスを押すと2回変わる");
   await page.keyboard.press("ControlOrMeta+z");
-  if (await cell(3, "archived").locator("input").isChecked()) throw new Error("Ctrl+Z でしまうが戻らない（2回目）");
+  if (await cell(3, "archived").locator("input").isChecked()) throw new Error("Ctrl+Z で無効が戻らない（2回目）");
 
   await page.getByRole("button", { name: "3件の変更を保存" }).click();
   await page.getByText("3件の家事を保存しました").waitFor();
@@ -271,6 +271,52 @@ try {
   if (who.length !== 3 || who.some((t) => t.trim() !== "たくみ")) throw new Error(`一覧の担当が「${who.join("、")}」`);
   await page.screenshot({ path: `${SHOTS}/40-table-saved.png`, fullPage: true });
   ok("表で直す：担当の3マスを範囲で選んで「たくみ」にし、保存すると一覧の3件とも担当がたくみになる（保存前に離れると確かめる）");
+
+  // ---- (10) 表で直す：2行の「削除」にチェックして保存し、確かめで OK すると一覧から消える ----
+  step = "table-delete";
+  await page.getByText("無効の家事も見る").waitFor();
+  await page.getByRole("button", { name: "表で直す" }).click();
+  await h1(page, "表で直す");
+  await grid.waitFor();
+  await grid.getByText("無効", { exact: true }).waitFor();
+  await grid.getByText("削除", { exact: true }).waitFor();
+  const gone = [await cell(1, "name").innerText(), await cell(2, "name").innerText()].map((t) => t.trim());
+  const left = (await cell(3, "name").innerText()).trim();
+  await cell(1, "delete").click();
+  await cell(2, "delete").click();
+  for (const r of [1, 2]) {
+    if (!(await cell(r, "delete").locator("input").isChecked())) throw new Error(`${r}行目の削除にチェックが入らない`);
+    if (!(await cell(r, "name").evaluate((e) => !!e.closest(".dsg-row.is-deleted")))) throw new Error(`${r}行目が削除の見た目にならない`);
+  }
+  // ほかの行の変更と削除は、保存ボタンで分けて数える
+  await cell(3, "archived").click();
+  await page.getByRole("button", { name: "1件の変更・2件の削除を保存" }).waitFor();
+  await page.keyboard.press("ControlOrMeta+z");
+  if (await cell(3, "archived").locator("input").isChecked()) throw new Error("Ctrl+Z で無効が戻らない");
+  await page.getByRole("button", { name: "2件の削除を保存" }).waitFor();
+  await page.mouse.click(10, 10);
+  await page.screenshot({ path: `${SHOTS}/41-table-delete.png` });
+
+  // 確かめでやめると、何も消えない
+  dismissNext = true;
+  await page.getByRole("button", { name: "2件の削除を保存" }).click();
+  for (const n of gone) if (!lastDialog.includes(n)) throw new Error(`確かめに「${n}」が無い: ${lastDialog}`);
+  if (!lastDialog.includes("元に戻せません") || !lastDialog.includes("『無効』")) throw new Error(`確かめの文が違う: ${lastDialog}`);
+  await page.getByRole("button", { name: "2件の削除を保存" }).waitFor();
+  if (!(await cell(1, "delete").locator("input").isChecked())) throw new Error("確かめでやめたのにチェックが消えた");
+
+  // OK すると消える
+  await page.getByRole("button", { name: "2件の削除を保存" }).click();
+  await page.getByText("2件の家事を削除しました").waitFor();
+  await page.getByRole("button", { name: "変更はありません" }).waitFor();
+  await expectText(1, "name", left);
+  if (await cell(2, "name").count()) throw new Error("消したのに表に行が残る");
+  await page.getByRole("button", { name: "家事", exact: true }).click();
+  await h1(page, "家事");
+  await page.getByRole("link", { name: left }).waitFor();
+  for (const n of gone) if (await page.getByRole("link", { name: n }).count()) throw new Error(`消したのに一覧に「${n}」が残る`);
+  await page.screenshot({ path: `${SHOTS}/42-table-deleted.png`, fullPage: true });
+  ok("表で直す：2行の「削除」にチェックして保存すると、名前を並べた確かめが出て、OK で一覧から消える（やめると残る）");
 
   // ---- (8) スマホ幅では1行ずつの画面 ----
   step = "phone";

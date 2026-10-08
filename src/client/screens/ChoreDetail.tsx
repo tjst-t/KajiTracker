@@ -7,7 +7,7 @@ import { HistoryCalendar } from "../components/HistoryCalendar";
 import { errorText } from "../format";
 import type { Nav } from "../router";
 
-/** S2 家事の詳細：次の期限、記録（取り消し・さかのぼり）、この家事の統計、編集・しまう・消す */
+/** S2 家事の詳細：次の期限、記録（取り消し・さかのぼり）、この家事の統計、編集・無効にする・消す */
 export function ChoreDetail({ id, nav }: { id: string; nav: Nav }) {
   const [c, setC] = useState<Detail | null>(null);
   const [date, setDate] = useState("");
@@ -72,7 +72,7 @@ export function ChoreDetail({ id, nav }: { id: string; nav: Nav }) {
             {describeSchedule(c.schedule)}
             {c.assigneeName ? `、担当 ${c.assigneeName}` : "、担当なし"}
             {c.notifyTime ? `、通知 ${c.notifyTime}` : ""}
-            {c.archived && "（しまってあります）"}
+            {c.archived && "（無効になっています）"}
           </p>
         </div>
         {!c.archived && <Hanko chore={c} today={c.today} />}
@@ -186,15 +186,15 @@ export function ChoreDetail({ id, nav }: { id: string; nav: Nav }) {
           <button
             className="btn"
             disabled={busy}
-            onClick={() => void run(() => api("PATCH", `/chores/${c.id}`, { archived: !c.archived }), c.archived ? "元に戻しました" : "しまいました。一覧と通知から外れます")}
+            onClick={() => void run(() => api("PATCH", `/chores/${c.id}`, { archived: !c.archived }), c.archived ? "有効に戻しました" : "無効にしました。今日の画面・一覧・通知から外れます。記録は残ります")}
           >
-            {c.archived ? "元に戻す" : "しまう"}
+            {c.archived ? "有効に戻す" : "無効にする"}
           </button>
           <button
             className="btn btn--danger-quiet"
             disabled={busy}
             onClick={async () => {
-              if (!confirm(`「${c.name}」を消しますか？ 記録もすべて消え、元に戻せません。季節ものなどは「しまう」を使うと記録が残ります。`)) return;
+              if (!confirm(`「${c.name}」を消しますか？ 記録もすべて消え、元に戻せません。季節ものなどは「無効にする」を使うと記録が残ります。`)) return;
               try {
                 await api("DELETE", `/chores/${c.id}`);
                 nav.go({ name: "chores" });

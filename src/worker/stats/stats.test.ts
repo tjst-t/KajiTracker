@@ -65,7 +65,7 @@ describe("統計の API", () => {
     expect(s.monthly.reduce((a: number, m: { count: number }) => a + m.count, 0)).toBe(3);
   });
 
-  it("しまった家事の記録も数える", async () => {
+  it("無効の家事の記録も数える", async () => {
     const { takumi, fam } = await family();
     const chore = (await takumi.post(`/api/families/${fam.id}/chores`, { name: "網戸", schedule: { type: "interval", intervalDays: 90, firstDueOn: addDays(today(), -5) } })).json;
     await takumi.post(`/api/chores/${chore.id}/logs`, { doneOn: addDays(today(), -2) });

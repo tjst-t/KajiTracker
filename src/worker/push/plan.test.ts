@@ -134,12 +134,12 @@ describe("planNotifications", () => {
     expect(who(planNotifications(i, jst(`${TODAY}T20:00`)))).toEqual({ a: ["洗濯"] });
   });
 
-  it("遅れている・まだ先・今日やった・しまった家事は送らない", () => {
+  it("遅れている・まだ先・今日やった・無効の家事は送らない", () => {
     const i = input([
       { id: "遅れ", schedule: { type: "interval", intervalDays: 7, firstDueOn: "2026-10-06" } },
       { id: "まだ先", schedule: { type: "interval", intervalDays: 7, firstDueOn: "2026-10-08" } },
       { id: "今日やった", doneOns: [TODAY] },
-      { id: "しまった", archived: true },
+      { id: "無効", archived: true },
       { id: "前回から7日", schedule: { type: "interval", intervalDays: 7, firstDueOn: "2026-09-01" }, doneOns: ["2026-09-30"] },
     ]);
     expect(who(planNotifications(i, jst(`${TODAY}T20:00`)))).toEqual({ a: ["前回から7日"] });

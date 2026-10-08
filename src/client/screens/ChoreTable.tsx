@@ -1,5 +1,6 @@
 // 登録済みの家事を表でまとめて直す（PC 幅）。表の部品は components/Sheet。
-// 行は全部の家事（しまったものも）。変えたマスに印を付け、変えた行の変えた項目だけを PATCH /families/:fid/chores/bulk で送る。
+// 行は全部の家事（無効のものも）。変えたマスに印を付け、変えた行の変えた項目だけを PATCH /families/:fid/chores/bulk で送る。
+// 「削除」にチェックした行は、確かめてから deleteIds で一緒に送る（ほかのマスの変更は送らない）。
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataSheetGrid } from "react-datasheet-grid";
 import { type DateStr, todayInTokyo, toDayNum } from "../../shared/date";
@@ -14,7 +15,7 @@ import { type Nav, setLeaveGuard } from "../router";
 import { useWide } from "./ChoreBulk";
 import { TIMES } from "./ChoreForm";
 
-type EditRow = { id: string; name: string; group: string; schedule: string; due: string; assignee: string; notify: string; archived: string };
+type EditRow = { id: string; name: string; group: string; schedule: string; due: string; assignee: string; notify: string; archived: string; delete: string };
 type Field = Exclude<keyof EditRow, "id">;
 
 /** 列の並び（col の番号はこの順） */
@@ -25,7 +26,8 @@ const COLS: (SheetCol & { field: Field })[] = [
   { field: "due", title: "次の期限", picker: "date", basis: 150 },
   { field: "assignee", title: "担当", picker: "list", basis: 130 },
   { field: "notify", title: "通知の時刻", picker: "list", basis: 120, minWidth: 100 },
-  { field: "archived", title: "しまう", picker: "check", basis: 80, grow: 0, minWidth: 80 },
+  { field: "archived", title: "無効", picker: "check", basis: 80, grow: 0, minWidth: 80 },
+  { field: "delete", title: "削除", picker: "check", basis: 80, grow: 0, minWidth: 80 },
 ];
 
 type Data = { today: DateStr; chores: ChoreView[]; groups: Group[]; members: Member[] };
@@ -45,6 +47,7 @@ function rowOf(c: ChoreView): EditRow {
     assignee: c.assigneeName ?? "",
     notify: c.notifyTime ?? "",
     archived: c.archived ? CHECKED : "",
+    delete: "",
   };
 }
 
@@ -210,7 +213,7 @@ export function ChoreTable({ family, nav }: { family: Family; nav: Nav }) {
       </div>
       <p className="muted">
         登録した家事を表でまとめて直します。変えたマスには印が付き、「保存」で変えた行だけが保存されます。範囲を選んで打ち、Ctrl（⌘）+Enter
-        で範囲の全部に同じ値が入ります。次の期限は、日数の周期と隔週・数か月ごとのときだけ変えられます。行の追加は「まとめて登録」、削除は家事の詳細から。
+        で範囲の全部に同じ値が入ります。次の期限は、日数の周期と隔週・数か月ごとのときだけ変えられます。行の追加は「まとめて登録」から。「削除」にチェックした家事は、保存すると記録ごと消えます（残したいときは「無効」に）。
       </p>
       {flash && (
         <p className="notice notice--ok" role="status">
@@ -231,8 +234,8 @@ export function ChoreTable({ family, nav }: { family: Family; nav: Nav }) {
           key={version}
           family={family}
           data={data}
-          onSaved={(n) => {
-            setFlash(`${n}件の家事を保存しました`);
+          onSaved={(updated, deleted) => {
+            setFlash([updated && `${updated}件の家事を保存しました`, deleted && `${deleted}件の家事を削除しました`].filter(Boolean).join("。"));
             void load();
           }}
           onEdit={() => setFlash(null)}
@@ -242,14 +245,14 @@ export function ChoreTable({ family, nav }: { family: Family; nav: Nav }) {
   );
 }
 
-function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; data: Data; onSaved: (n: number) => void; onEdit: () => void }) {
+function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; data: Data; onSaved: (updated: number, deleted: number) => void; onEdit: () => void }) {
   const { groups, members } = data;
   const today = todayInTokyo();
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // しまったものは後ろ、グループの並び順（グループなしは最後）、名前の順
+  // 無効のものは後ろ、グループの並び順（グループなしは最後）、名前の順
   const { initial, byId } = useMemo(() => {
     const order = new Map(groups.map((g, i) => [g.id, i]));
     const sorted = [...data.chores].sort(
@@ -280,9 +283,11 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
   );
   checksRef.current = checks;
 
-  const changedRows = rows.filter((r) => checks.get(r.id)!.changed.size > 0);
-  const invalid = rows.filter((r) => Object.keys(checks.get(r.id)!.errors).length > 0);
-  const dirty = changedRows.length > 0;
+  // 削除する行は、ほかのマスを変えていても消すだけ（変更としては数えない）
+  const deleteRows = rows.filter((r) => r.delete);
+  const changedRows = rows.filter((r) => !r.delete && checks.get(r.id)!.changed.size > 0);
+  const invalid = rows.filter((r) => !r.delete && Object.keys(checks.get(r.id)!.errors).length > 0);
+  const dirty = changedRows.length > 0 || deleteRows.length > 0;
 
   // 保存しないで離れようとしたら確かめる（アプリの中の移動・戻る・タブを閉じる・読み直す）
   useEffect(() => {
@@ -301,6 +306,7 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
     cellOf: (r, field, disabled) => {
       const check = checks.get(r.id);
       const f = field as Field;
+      if (r.delete) return { rowError: rowErrors[r.id], changed: f === "delete" };
       const error = check?.errors[f];
       const out = { error, rowError: rowErrors[r.id], changed: check?.changed.has(f) };
       if (f === "notify" && !r.notify) return { ...out, shown: <span className="bulk-grid__hint">それぞれ</span> };
@@ -324,16 +330,27 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
       setError(`赤いマスを直してください（${badChanged.length}行）`);
       return;
     }
+    if (deleteRows.length) {
+      const names = deleteRows.map((r) => `・${byId.get(r.id)!.orig.name}`).join("\n");
+      const ok = confirm(`次の${deleteRows.length}件の家事を削除します。\n${names}\n\n記録もすべて消え、元に戻せません。残したいときは『無効』にしてください。`);
+      if (!ok) return;
+    }
     setBusy(true);
     setRowErrors({});
     try {
-      const res = await api<{ updated: number }>("PATCH", `/families/${family.id}/chores/bulk`, { chores: changedRows.map((r) => checks.get(r.id)!.payload) });
+      const res = await api<{ updated: number; deleted: number }>("PATCH", `/families/${family.id}/chores/bulk`, {
+        chores: changedRows.map((r) => checks.get(r.id)!.payload),
+        deleteIds: deleteRows.map((r) => r.id),
+      });
       setLeaveGuard(null);
-      onSaved(res.updated);
+      onSaved(res.updated, res.deleted);
     } catch (e) {
       if (e instanceof ApiError && e.code === "bulk_invalid" && e.detail?.rows) {
         const map: Record<string, string> = {};
-        for (const { index, message } of e.detail.rows as { index: number; message: string }[]) if (changedRows[index]) map[changedRows[index].id] = message;
+        for (const { index, message, kind } of e.detail.rows as { index: number; message: string; kind?: "delete" }[]) {
+          const r = (kind === "delete" ? deleteRows : changedRows)[index];
+          if (r) map[r.id] = message;
+        }
         setRowErrors(map);
       }
       setError(errorText(e));
@@ -344,7 +361,7 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
   // 表の下に出す、行ごとの直すところ
   const notes = rows.flatMap((r, i) => {
     const out: { key: string; text: string }[] = [];
-    const errs = checks.get(r.id)?.errors ?? {};
+    const errs = r.delete ? {} : (checks.get(r.id)?.errors ?? {});
     for (const c of COLS) if (errs[c.field]) out.push({ key: `${r.id}-${c.field}`, text: `${i + 1}行目（${r.name || "名前なし"}）・${c.title}：${errs[c.field]}` });
     if (rowErrors[r.id]) out.push({ key: `${r.id}-server`, text: `${i + 1}行目（${r.name}）：${rowErrors[r.id]}` });
     return out;
@@ -354,7 +371,10 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
     <>
       <SheetCtx.Provider value={ctx}>
         <div className="bulk-grid">
-          <DataSheetGrid<EditRow> {...sheet.gridProps} lockRows height={ROW_HEIGHT * Math.min(rows.length + 1, 16) + 2} addRowsComponent={false} />
+          <DataSheetGrid<EditRow>
+            {...sheet.gridProps}
+            rowClassName={({ rowData }) => (rowData.delete ? "is-deleted" : undefined)}
+            lockRows height={ROW_HEIGHT * Math.min(rows.length + 1, 16) + 2} addRowsComponent={false} />
         </div>
       </SheetCtx.Provider>
 
@@ -374,7 +394,13 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
       )}
       <div className="form-actions bulk-actions">
         <button className="btn btn--primary" disabled={busy || !dirty} onClick={() => void save()}>
-          {dirty ? `${changedRows.length}件の変更を保存` : "変更はありません"}
+          {!dirty
+            ? "変更はありません"
+            : deleteRows.length === 0
+              ? `${changedRows.length}件の変更を保存`
+              : changedRows.length === 0
+                ? `${deleteRows.length}件の削除を保存`
+                : `${changedRows.length}件の変更・${deleteRows.length}件の削除を保存`}
         </button>
         <button className="btn btn--quiet" disabled={!sheet.canUndo} onClick={undo}>
           元に戻す

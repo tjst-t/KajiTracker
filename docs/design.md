@@ -111,7 +111,7 @@ PK は (key, window_start)。
 | calendar_rule | text NULL | `calendar` のとき。JSON（下を参照） |
 | assignee_user_id | text NULL | 担当者。抜けたら NULL に戻す |
 | notify_time | text NULL | 家事ごとの通知の時刻。あれば人の時刻より優先 |
-| archived_at | timestamp NULL | しまった家事（一覧と通知から外す。記録と統計は残す） |
+| archived_at | timestamp NULL | 無効にした家事（今日の画面・一覧・通知から外す。記録と統計は残す。画面では「無効」） |
 | created_by / created_at / updated_at | | |
 
 `calendar_rule` の形：
@@ -206,7 +206,7 @@ Family を作ると「キッチン・風呂・トイレ・洗濯・ゴミ捨て�
 |---|---|---|---|
 | S1 | **今日**（ホーム） | スマホ | いちばん上に「期限が来ている」家事（遅れ日数の多い順、次に今日のもの）。大きな「やった」ボタンでワンタップ記録、押した直後に「取り消す」を出す。その下に「近いうち（7日以内）」、「そのほか」 |
 | S2 | 家事の詳細 | 両方 | 次の期限・周期・担当。記録の履歴（カレンダー表示）、記録の取り消し、過去の日付で記録。この家事の統計（守れた率、平均の遅れ、実際の平均間隔と周期の差） |
-| S3 | 家事の登録・編集 | PC | 名前、周期の種類（日数＋最初の期限 ／ カレンダーの規則）、担当者、通知の時刻、しまう・消す |
+| S3 | 家事の登録・編集 | PC | 名前、周期の種類（日数＋最初の期限 ／ カレンダーの規則）、担当者、通知の時刻、無効にする・消す |
 | S4 | 家事の一覧 | PC | 表で全部の家事。周期・次の期限・担当・最後にやった人で並べ替え |
 | S5 | 統計 | 両方 | 期間の切り替え（今月・3か月・全期間）。分担、担当の偏り、守れた率と平均の遅れ、週・月ごとの回数の推移、よく遅れる家事のランキング |
 | S6 | Family | 両方 | メンバーと役割。管理者は：招待の QR、外す、管理者にする・戻す、回復の札を出す、名前の変更、削除。だれでも：抜ける |
@@ -248,18 +248,18 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
 - `POST /families/:fid/members/:uid/recovery-ticket`（管理者★）
 
 **家事と記録**
-- `GET /families/:fid/chores`（期限・状態・前回の記録つき。`?archived=1` でしまった家事も）、`POST /families/:fid/chores`
-- `GET /chores/:id`（記録・回・家事ごとの統計つき）、`PATCH /chores/:id`（`archived` でしまう・戻す）、`DELETE /chores/:id`
+- `GET /families/:fid/chores`（期限・状態・前回の記録つき。`?archived=1` で無効の家事も）、`POST /families/:fid/chores`
+- `GET /chores/:id`（記録・回・家事ごとの統計つき）、`PATCH /chores/:id`（`archived` で無効にする・有効に戻す）、`DELETE /chores/:id`
 - `POST /chores/:id/logs`（`doneOn` は省くと今日。先の日付は断る）、`DELETE /logs/:id`（取り消し。家族のだれでも）
 - 周期の入力：`{type:"interval", intervalDays, firstDueOn}` か `{type:"calendar", rule}`。毎週・毎月は anchor を省くと登録した日（編集では前の基準日）。隔週・数か月ごとは anchor 必須で、規則に当たる日でなければ断る
 
 - `GET /families/:fid/groups`、`POST /families/:fid/groups`、`PATCH /groups/:id`（名前・並び順）、`DELETE /groups/:id`（家事はグループなしに）
 - `POST /families/:fid/chores/bulk`（まとめて登録。1行でも不備があれば1件も入れず、`rows: [{index, message}]` を返す。100件まで）
-- `PATCH /families/:fid/chores/bulk`（表で直す。`{ chores: [{ id, name?, schedule?, groupId?, assigneeUserId?, notifyTime?, archived? }] }`。来なかった項目は変えない。よその Family の家事・不備が1行でもあれば1件も変えず `bulk_invalid` の 400。周期の基準日は `PATCH /chores/:id` と同じく引き継ぐ。200件まで）
+- `PATCH /families/:fid/chores/bulk`（表で直す。`{ chores: [{ id, name?, schedule?, groupId?, assigneeUserId?, notifyTime?, archived? }] }`。来なかった項目は変えない。よその Family の家事・不備が1行でもあれば1件も変えず `bulk_invalid` の 400。周期の基準日は `PATCH /chores/:id` と同じく引き継ぐ。`deleteIds?: string[]` で一緒に消せる（記録も cascade で消える。変更と削除は1つの batch。消す側の不備は `kind: "delete"` と deleteIds の中の位置。同じ家事を両方に入れると 400）。返り値は `{ updated, deleted }`。変更と削除を合わせて200件まで）
 
 **統計**
 - `GET /families/:fid/stats?from=&to=`（日本時間の日付、両端を含む。省いた側は今月の初日・末日）。計算は `src/shared/stats.ts`
-  - 取り消した記録は数えない。しまった家事は含める（期限の計算は、しまった日で打ち切る）
+  - 取り消した記録は数えない。無効の家事は含める（期限の計算は、無効にした日で打ち切る）
   - 守り具合は、期間内に期限がある「回」（2 の統計用の「回」）で数える。家事の詳細の統計と同じ数え方。いま開いている回は数えない
 
 ```

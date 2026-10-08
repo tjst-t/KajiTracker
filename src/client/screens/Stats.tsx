@@ -117,7 +117,7 @@ export function StatsScreen({ family }: { family: Family }) {
                       <li key={c.choreId} className="bias__row">
                         <p className="bias__name">
                           {c.name}
-                          {c.archived && <span className="tag">しまった</span>}
+                          {c.archived && <span className="tag">無効</span>}
                           <span className="muted"> {c.count}回</span>
                         </p>
                         <span className="stack-bar" aria-hidden="true">
@@ -157,7 +157,7 @@ export function StatsScreen({ family }: { family: Family }) {
                         <div className="ranking__body">
                           <p className="ranking__name">
                             {c.name}
-                            {c.archived && <span className="tag">しまった</span>}
+                            {c.archived && <span className="tag">無効</span>}
                           </p>
                           <span className="hbars__track hbars__track--thin" aria-hidden="true">
                             <span className="hbars__bar hbars__bar--late" style={{ width: `${(c.score / data.lateRanking[0]!.score) * 100}%` }} />

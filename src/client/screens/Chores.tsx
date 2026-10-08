@@ -93,7 +93,7 @@ export function Chores({ family, nav }: { family: Family; nav: Nav }) {
           </label>
           <label className="check">
             <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-            しまった家事も見る
+            無効の家事も見る
           </label>
         </div>
       )}
@@ -142,7 +142,7 @@ export function Chores({ family, nav }: { family: Family; nav: Nav }) {
                       >
                         {c.name}
                       </a>
-                      {c.archived && <span className="tag">しまってある</span>}
+                      {c.archived && <span className="tag">無効</span>}
                     </th>
                     <td data-label="周期">{describeSchedule(c.schedule)}</td>
                     <td data-label="次の期限">

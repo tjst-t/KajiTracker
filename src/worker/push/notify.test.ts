@@ -92,7 +92,7 @@ describe("Cron で当日の家事を送る", () => {
     const sentaku = await s.chore(fam, "洗濯槽の掃除");
     const furo = await s.chore(fam, "風呂掃除", { assignee: a });
     await s.chore(fam, "遅れている", { firstDueOn: "2026-10-01" });
-    await s.chore(fam, "しまった", { archived: true });
+    await s.chore(fam, "無効", { archived: true });
     const done = await s.chore(fam, "今日やった");
     await s.log(done, a, TODAY);
 

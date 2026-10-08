@@ -12,7 +12,7 @@ const chores: StatsChore[] = [
   { id: "x", name: "風呂掃除", schedule: interval(3, "2026-10-01"), archivedOn: null },
   // 毎週日曜。10-04 は期限内、10-11 はやらずに過ぎた、10-18 は 1日遅れ
   { id: "y", name: "シーツ交換", schedule: sundays, archivedOn: null },
-  // 7日ごと。期限 09-20 の回（5日遅れ）は期間の外、10-02 の回は 2日遅れ。10-10 にしまった
+  // 7日ごと。期限 09-20 の回（5日遅れ）は期間の外、10-02 の回は 2日遅れ。10-10 に無効にした
   { id: "z", name: "植木の水やり", schedule: interval(7, "2026-09-20"), archivedOn: "2026-10-10" },
   // 毎月25日。まだ予定日が来ていない
   { id: "w", name: "排水口", schedule: { type: "calendar", rule: { kind: "monthly_day", day: 25, every: 1, anchor: "2026-10-01" } }, archivedOn: null },
@@ -60,7 +60,7 @@ describe("統計（今月）", () => {
     ]);
   });
 
-  it("担当の偏り：家事ごとの人別回数。記録の無い家事は出ない。しまった家事も出る", () => {
+  it("担当の偏り：家事ごとの人別回数。記録の無い家事は出ない。無効の家事も出る", () => {
     expect(s.byChore).toEqual([
       { choreId: "x", name: "風呂掃除", archived: false, count: 4, byUser: [{ userId: "a", count: 3 }, { userId: "b", count: 1 }] },
       { choreId: "y", name: "シーツ交換", archived: false, count: 2, byUser: [{ userId: "c", count: 1 }, { userId: "b", count: 1 }] },
@@ -93,7 +93,7 @@ describe("統計（今月）", () => {
   });
 });
 
-describe("統計（期間・しまった家事）", () => {
+describe("統計（期間・無効の家事）", () => {
   it("全期間：推移はいちばん古い日から。期間の前の回も入る", () => {
     const s = computeStats(input({ from: "2000-01-01" }));
     expect(s.totalCount).toBe(8);
@@ -117,7 +117,7 @@ describe("統計（期間・しまった家事）", () => {
     expect(s.weekly.every((w) => w.weekStart <= "2000-12-31")).toBe(true);
   });
 
-  it("しまった家事は、しまった日より後の予定日を数えない", () => {
+  it("無効の家事は、無効にした日より後の予定日を数えない", () => {
     const archivedY = chores.map((c) => (c.id === "y" ? { ...c, archivedOn: "2026-10-12" } : c));
     const s = computeStats(input({ chores: archivedY }));
     // 10-11 の回は 10-12 の時点でまだ開いている → 数えない。10-18 の回も数えない

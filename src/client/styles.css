@@ -1616,3 +1616,18 @@ select {
   height: 1.125rem;
   margin: 0;
 }
+
+/* 表で直す：削除にチェックした行（ほかのマスの変更より「消す」を目立たせる） */
+.bulk-grid .dsg-row.is-deleted .bulk-grid__cell:not([data-cell$="-delete"]) {
+  background: var(--shu-tint);
+  box-shadow: none;
+  color: var(--ink-soft);
+  opacity: 0.55;
+}
+.bulk-grid .dsg-row.is-deleted .bulk-grid__cell:not([data-cell$="-delete"]) .bulk-grid__text {
+  text-decoration: line-through;
+}
+.bulk-grid .dsg-row.is-deleted .bulk-grid__cell[data-cell$="-delete"] {
+  background: var(--shu-tint);
+  box-shadow: inset 0 0 0 1.5px var(--danger);
+}

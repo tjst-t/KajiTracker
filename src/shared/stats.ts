@@ -1,8 +1,8 @@
 // Family 全体の統計。仕様は docs/spec.md「統計」、返す形は docs/design.md の 5「統計」。
 // 期限の守り具合は src/shared/schedule.ts の evaluate の「回」から出す（家事ごとの統計 choreStats と同じ数え方）。副作用は持たない。
 //
-// しまった家事も含める（docs/design.md の 1：しまっても記録と統計は残す）。
-// ただし期限の計算は、しまった日で打ち切る（しまったあとの予定日を「やらなかった」と数えないように）。
+// 無効の家事も含める（docs/design.md の 1：無効にしても記録と統計は残す）。
+// ただし期限の計算は、無効にした日で打ち切る（無効にしたあとの予定日を「やらなかった」と数えないように）。
 import { type DateStr, type DayNum, daysInMonth, fromDayNum, toDayNum, weekdayOf, ymdOf } from "./date";
 import { type Cycle, type Schedule, evaluate } from "./schedule";
 
@@ -10,7 +10,7 @@ export type StatsChore = {
   id: string;
   name: string;
   schedule: Schedule;
-  /** しまった日（日本時間）。しまっていなければ null */
+  /** 無効にした日（日本時間）。無効でなければ null */
   archivedOn: DateStr | null;
 };
 
