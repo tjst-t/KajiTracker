@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f1f4f1" />
     <title>KajiTracker</title>
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- 公開 URL の前に banto のログインがあるので、マニフェストも Cookie 付きで取る（無いと 401 でインストールできない） -->
+    <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
