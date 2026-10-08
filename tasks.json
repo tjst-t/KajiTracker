@@ -236,7 +236,7 @@
       "number": 7,
       "kind": "story",
       "title": "統計",
-      "status": "ready",
+      "status": "done",
       "parent": null,
       "dependsOn": [
         "item-2"
@@ -246,12 +246,12 @@
       "labels": [],
       "body": "docs/spec.md「統計」、docs/design.md の S2・S5。",
       "doneWhen": "分担・偏り・守れた率・平均の遅れ・推移・ランキング・家事ごとの平均間隔が、テスト用のデータで期待どおりの値になり画面に出る",
-      "resolution": null,
+      "resolution": "タスク stats-api・stats-ui とバグ stats-range-limit を Factory で取り込み。手元で npm test 142 件と e2e（stats-flow：5タブ・空の案内・期間切り替え・390px/1280px・実施カレンダー）を確認し、スクリーンショットで見た目も確認。",
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-06T02:51:10.821Z",
-      "updatedAt": "2026-10-06T02:51:29.649Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-08T00:19:40.291Z",
+      "closedAt": "2026-10-08T00:19:40.291Z",
       "extra": {}
     },
     {
