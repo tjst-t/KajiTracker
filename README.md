@@ -19,6 +19,8 @@ npm run e2e                # 本物のブラウザ（Chromium）と仮想パス�
 
 `npm run e2e` は開発サーバを起こしてから（統計と実施カレンダーは `e2e/stats-flow.mjs`）。初回は `npx playwright install --with-deps chromium`。
 開発サーバを別の URL（banto の公開など）から開くときは、`.dev.vars` の `ORIGINS` にその URL を足す。
+`e2e/push-flow.mjs`（通知のオン・オフ）は VAPID の鍵（下）が要る。別のポートで起こしたときは `E2E_ORIGIN=http://localhost:5174` のように渡す。
+ヘッドレスの Chromium は本物のプッシュサービスにつながらないので、購読（`pushManager.subscribe`）だけ偽物に差し替えて、画面と API の流れを確かめている。
 
 テーブルを変えたら `src/worker/db/schema.ts` を直して `npm run db:generate`。
 `wrangler.jsonc` を変えたら `npm run cf-typegen`。

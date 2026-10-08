@@ -3,6 +3,7 @@ import { type Me, type PasskeyItem, type SessionItem, type SessionVia, api } fro
 import { registerPasskey, withStepUp } from "../auth";
 import { type IssuedQr, QrDialog } from "../components/QrDialog";
 import { errorText, formatDateTime } from "../format";
+import { type PushState, getPushState, turnOffPush, turnOnPush } from "../push";
 
 const TIMES = Array.from({ length: 96 }, (_, i) => `${String(Math.floor(i / 4)).padStart(2, "0")}:${String((i % 4) * 15).padStart(2, "0")}`);
 
@@ -93,6 +94,7 @@ export function Settings({ me, onChanged, onLoggedOut }: { me: Me; onChanged: ()
             ))}
           </select>
         </label>
+        <PushToggle />
       </section>
 
       <section className="section" aria-labelledby="s-passkeys">
@@ -199,5 +201,58 @@ export function Settings({ me, onChanged, onLoggedOut }: { me: Me; onChanged: ()
         />
       )}
     </main>
+  );
+}
+
+/** この端末で通知を受けるかのオン・オフ。いまの状態（許可済み・拒否・未対応）に合わせて出し分ける */
+function PushToggle() {
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getPushState()
+      .then(setState)
+      .catch(() => setState("unsupported"));
+  }, []);
+
+  if (state === null) return null;
+  if (state === "needs-home-screen")
+    return (
+      <p className="notice" data-testid="push-home-screen">
+        ホーム画面に追加すると通知を受けられます。共有ボタン → ホーム画面に追加
+      </p>
+    );
+  if (state === "unsupported") return <p className="muted">このブラウザでは通知を受けられません。</p>;
+
+  const toggle = async (on: boolean) => {
+    setBusy(true);
+    setError(null);
+    try {
+      setState(await (on ? turnOnPush() : turnOffPush()));
+    } catch (e) {
+      setError(errorText(e));
+      setState(await getPushState().catch(() => state));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="field">
+      <label className="check">
+        <input type="checkbox" checked={state === "on"} disabled={busy || state === "denied"} onChange={(e) => void toggle(e.target.checked)} />
+        この端末で通知を受ける
+      </label>
+      {state === "on" && <p className="muted">この端末に、通知の時刻にお知らせが届きます。</p>}
+      {state === "denied" && (
+        <p className="notice">通知が拒否されています。受けるには、ブラウザ（またはスマホ）の設定で、このサイトの通知を許可してください。</p>
+      )}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
