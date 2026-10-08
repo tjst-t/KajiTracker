@@ -510,7 +510,7 @@
       "number": 22,
       "kind": "task",
       "title": "表で直す画面から削除できるようにし、「しまう」を「無効」に言い換える",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [],
       "milestone": null,
@@ -522,7 +522,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-08T06:28:27.818Z",
-      "updatedAt": "2026-10-08T06:28:27.818Z",
+      "updatedAt": "2026-10-08T06:28:42.033Z",
       "closedAt": null,
       "extra": {}
     }
