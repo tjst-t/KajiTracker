@@ -1,13 +1,15 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { addDays, todayInTokyo } from "../../shared/date";
 import { describeRule, shortDate } from "../../shared/describe";
 import { evaluate } from "../../shared/schedule";
-import { CHORE_TEMPLATES, type ChoreTemplate } from "../../shared/templates";
+import type { ChoreTemplate } from "../../shared/templates";
 import { ApiError, type Family, type Group, type Member, api } from "../api";
 import type { ChoreView } from "../chores";
 import { type CalState, CalendarFields, anchorOfCal, calValid, initialCal, ruleForApi, ruleOfCal } from "../components/CalendarFields";
+import { TemplateDialog, useModal } from "../components/TemplateDialog";
 import { errorText } from "../format";
 import type { Nav } from "../router";
+import { ChoreBulkGrid } from "./ChoreBulkGrid";
 
 type Row = {
   key: number;
@@ -34,19 +36,27 @@ const blankRow = (today: string, patch: Partial<Row> = {}): Row => ({
 });
 const isBlank = (r: Row) => !r.name.trim();
 
-/** 表でまとめて登録。1行が1つの家事。名前が空の行は登録しない */
+/** PC 幅（41rem より広い）か。幅が変われば切り替わる */
+const WIDE_QUERY = "(min-width: 41.01rem)";
+function useWide() {
+  const [wide, setWide] = useState(() => matchMedia(WIDE_QUERY).matches);
+  useEffect(() => {
+    const mq = matchMedia(WIDE_QUERY);
+    const on = () => setWide(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return wide;
+}
+
+export type BulkData = { groups: Group[]; members: Member[]; existing: string[] };
+
+/** まとめて登録。PC 幅ではエクセルのような表、スマホ幅では1行ずつの入力欄 */
 export function ChoreBulk({ family, nav }: { family: Family; nav: Nav }) {
-  const today = todayInTokyo();
-  const [rows, setRows] = useState<Row[]>(() => [blankRow(today), blankRow(today), blankRow(today)]);
+  const wide = useWide();
   const [groups, setGroups] = useState<Group[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [existing, setExisting] = useState<string[]>([]);
-  const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
-  const [editingCal, setEditingCal] = useState<number | null>(null);
-  const [picking, setPicking] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     api<Group[]>("GET", `/families/${family.id}/groups`).then(setGroups).catch(() => {});
     api<Member[]>("GET", `/families/${family.id}/members`).then(setMembers).catch(() => {});
@@ -54,6 +64,19 @@ export function ChoreBulk({ family, nav }: { family: Family; nav: Nav }) {
       .then((d) => setExisting(d.chores.map((c) => c.name)))
       .catch(() => {});
   }, [family.id]);
+  const data = { groups, members, existing };
+  return wide ? <ChoreBulkGrid family={family} nav={nav} data={data} /> : <ChoreBulkRows family={family} nav={nav} data={data} />;
+}
+
+/** スマホ幅：1行が1つの家事。名前が空の行は登録しない */
+function ChoreBulkRows({ family, nav, data: { groups, members, existing } }: { family: Family; nav: Nav; data: BulkData }) {
+  const today = todayInTokyo();
+  const [rows, setRows] = useState<Row[]>(() => [blankRow(today), blankRow(today), blankRow(today)]);
+  const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
+  const [editingCal, setEditingCal] = useState<number | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const update = (key: number, patch: Partial<Row>) => {
     setRows((rs) => {
@@ -255,14 +278,6 @@ export function ChoreBulk({ family, nav }: { family: Family; nav: Nav }) {
   );
 }
 
-function useModal(onClose: () => void) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    if (!ref.current?.open) ref.current?.showModal();
-  }, []);
-  return { ref, onClose };
-}
-
 /** 曜日・日付で決める小さな画面 */
 function CalendarDialog({ initial, today, onSave, onCancel }: { initial: CalState; today: string; onSave: (c: CalState) => void; onCancel: () => void }) {
   const [cal, setCal] = useState(initial);
@@ -275,54 +290,6 @@ function CalendarDialog({ initial, today, onSave, onCancel }: { initial: CalStat
       <div className="form-actions">
         <button className="btn btn--primary" disabled={!calValid(cal)} onClick={() => onSave(cal)}>
           決める
-        </button>
-        <button className="btn btn--quiet" onClick={() => ref.current?.close()}>
-          やめる
-        </button>
-      </div>
-    </dialog>
-  );
-}
-
-/** よくある家事から選ぶ。グループごとに並べ、もうある家事は最初から外しておく */
-function TemplateDialog({ existing, onAdd, onCancel }: { existing: string[]; onAdd: (t: ChoreTemplate[]) => void; onCancel: () => void }) {
-  const [checked, setChecked] = useState<Set<string>>(() => new Set(CHORE_TEMPLATES.filter((t) => !existing.includes(t.name)).map((t) => t.name)));
-  const { ref } = useModal(onCancel);
-  const byGroup = [...new Set(CHORE_TEMPLATES.map((t) => t.group))].map((g) => ({ group: g, items: CHORE_TEMPLATES.filter((t) => t.group === g) }));
-  const toggle = (name: string, on: boolean) => setChecked((s) => (on ? new Set(s).add(name) : new Set([...s].filter((n) => n !== name))));
-  const scheduleText = (t: ChoreTemplate) =>
-    t.schedule.type === "interval" ? `${t.schedule.intervalDays}日ごと` : describeRule({ kind: "weekly", weekdays: t.schedule.weekdays, every: 1, anchor: "2026-01-01" });
-
-  return (
-    <dialog ref={ref} className="dialog dialog--wide" onClose={onCancel} aria-labelledby="tpl-dialog-title">
-      <h2 id="tpl-dialog-title">よくある家事から選ぶ</h2>
-      <p className="muted">選んだ家事を表に足します。周期や期限は、表で直せます。</p>
-      <div className="templates">
-        {byGroup.map(({ group, items }) => (
-          <fieldset key={group} className="fieldset">
-            <legend>{group}</legend>
-            {items.map((t) => {
-              const have = existing.includes(t.name);
-              return (
-                <label key={t.name} className="check template">
-                  <input type="checkbox" checked={checked.has(t.name)} onChange={(e) => toggle(t.name, e.target.checked)} />
-                  <span>
-                    {t.name}
-                    <span className="muted">
-                      {" "}
-                      {scheduleText(t)}
-                      {have && "（もうあります）"}
-                    </span>
-                  </span>
-                </label>
-              );
-            })}
-          </fieldset>
-        ))}
-      </div>
-      <div className="form-actions">
-        <button className="btn btn--primary" disabled={checked.size === 0} onClick={() => onAdd(CHORE_TEMPLATES.filter((t) => checked.has(t.name)))}>
-          {checked.size}件を表に足す
         </button>
         <button className="btn btn--quiet" onClick={() => ref.current?.close()}>
           やめる

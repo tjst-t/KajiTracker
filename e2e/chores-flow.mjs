@@ -10,10 +10,11 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SHOTS = join(ROOT, "e2e", "screenshots");
 mkdirSync(SHOTS, { recursive: true });
 
+const ORIGIN = process.env.E2E_ORIGIN ?? "http://localhost:5173";
 const jst = (offsetDays = 0) => new Date(Date.now() + 9 * 3600_000 + offsetDays * 86400_000).toISOString().slice(0, 10);
 const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 
-const link = execSync("npm run -s bootstrap-link", { cwd: ROOT }).toString().match(/http:\/\/localhost:5173\/#login=\S+/)[0];
+const link = execSync(`npm run -s bootstrap-link -- --origin ${ORIGIN}`, { cwd: ROOT }).toString().match(/http:\/\/localhost:\d+\/#login=\S+/)[0];
 const browser = await chromium.launch();
 const errors = [];
 let step = "";
@@ -140,7 +141,7 @@ try {
   step = "pc";
   const pcPage = await ctx.newPage();
   await pcPage.setViewportSize({ width: 1280, height: 800 });
-  await pcPage.goto("http://localhost:5173/chores");
+  await pcPage.goto(`${ORIGIN}/chores`);
   await h1(pcPage, "家事");
   await pcPage.getByRole("cell", { name: "隔週 " + wd + "曜" }).waitFor();
   await pcPage.screenshot({ path: `${SHOTS}/16-chores-pc.png`, fullPage: true });
@@ -157,6 +158,8 @@ try {
 
   // ---- まとめて登録：よくある家事から選ぶ＋手で1行（曜日で）＋不備の行 ----
   step = "bulk";
+  // PC 幅のまとめて登録は表（bulk-grid-flow で確かめる）。ここではスマホ幅の1行ずつの画面を通す
+  await pcPage.setViewportSize({ width: 600, height: 900 });
   await pcPage.getByRole("button", { name: "家事", exact: true }).click();
   await pcPage.getByRole("button", { name: "まとめて登録" }).click();
   await h1(pcPage, "まとめて登録");
@@ -188,6 +191,7 @@ try {
   await pcPage.getByLabel("1行目の何日ごと", { exact: true }).fill("7");
   await pcPage.getByRole("button", { name: "10件を登録" }).click();
   await pcPage.getByText("10件の家事を登録しました").waitFor();
+  await pcPage.setViewportSize({ width: 1280, height: 800 });
   ok("まとめて登録：よくある家事9件＋手で1件（毎月1日）、不備の行を直して10件登録");
 
   // ---- 一覧：グループの見出しと絞り込み ----

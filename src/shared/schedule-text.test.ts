@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CalendarRule, Schedule } from "./schedule";
-import { type ParsedScheduleText, formatScheduleText, parseScheduleText } from "./schedule-text";
+import { type ParsedScheduleText, formatScheduleText, parseDateText, parseScheduleText } from "./schedule-text";
 
 // 参考：2026-10-08 は木曜。2026-10-04 は日曜。
 const TODAY = "2026-10-08";
@@ -184,5 +184,24 @@ describe("書いて読むと元に戻る", () => {
       expect(r).toMatchObject({ ok: true, kind: "calendar", rule, needsAnchor: s.rule.every >= 2 });
       if (r.ok && r.kind === "calendar") expect(r.rule).toEqual(rule);
     }
+  });
+});
+
+describe("日付の文字を読む", () => {
+  const d = (t: string) => parseDateText(t, TODAY);
+  it("年つき", () => {
+    for (const t of ["2026-10-20", "2026/10/20", "2026.10.20", "2026年10月20日", "２０２６－１０－２０", "2026/10/20（火）", "2026-1-5"]) {
+      expect(d(t), t).toBe(t.includes("1-5") ? "2026-01-05" : "2026-10-20");
+    }
+  });
+  it("年なしは今年。半年より前なら来年", () => {
+    expect(d("10/20")).toBe("2026-10-20");
+    expect(d("10月20日")).toBe("2026-10-20");
+    expect(d("10/20(火)")).toBe("2026-10-20");
+    expect(d("9/1")).toBe("2026-09-01");
+    expect(d("1/5")).toBe("2027-01-05");
+  });
+  it("読めない・無い日付は null", () => {
+    for (const t of ["", "あした", "2026-02-30", "13/1", "10/32", "20261020"]) expect(d(t), t).toBeNull();
   });
 });

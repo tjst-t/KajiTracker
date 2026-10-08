@@ -1,7 +1,7 @@
 // 周期を1つのマスの文字で書く・読む（まとめて登録の表で使う）。副作用は持たない。
 // 書き方は describeSchedule と同じ（「7日ごと」「毎週 月・木曜」「隔週 土曜」「毎月 第1日曜」「3か月ごと 最終金曜」「毎月 末日」）。
 // 読むほうはゆるく、全角・空白・「曜日」の有無・区切りの違いなどを受け付ける。
-import { type DateStr, addDays, toDayNum } from "./date";
+import { type DateStr, addDays, isDateStr, toDayNum } from "./date";
 import { WEEKDAYS, describeSchedule } from "./describe";
 import { type CalendarRule, type Schedule, nextOccurrenceAfter } from "./schedule";
 
@@ -120,4 +120,24 @@ export function parseScheduleText(text: string, today: DateStr): ParsedScheduleT
   if (hasWeekPrefix) return fail(`「${text.trim()}」の曜日が読めません（例：毎週 月・木、隔週 土）`);
 
   return fail(`「${text.trim()}」は周期として読めません（${EXAMPLES}）`);
+}
+
+/**
+ * 表のマスの日付の文字を YYYY-MM-DD にする。読めなければ null。
+ * 「2026-10-20」「2026/10/20」「2026年10月20日」「10/20」「10月20日」、後ろの「（火）」も受け付ける。
+ * 年が無いときは今年。ただし半年より前になるなら来年とみなす（12月に「1/5」と書いたら来年）。
+ */
+export function parseDateText(text: string, today: DateStr): DateStr | null {
+  const s = text
+    .normalize("NFKC")
+    .replace(/\s+/g, "")
+    .replace(/\([日月火水木金土]曜?日?\)$/, "");
+  const m = s.match(/^(?:(\d{4})[-/.年])?(\d{1,2})[-/.月](\d{1,2})日?$/);
+  if (!m) return null;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const build = (y: number) => `${y}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`;
+  let d = build(m[1] !== undefined ? Number(m[1]) : Number(today.slice(0, 4)));
+  if (!isDateStr(d)) return null;
+  if (m[1] === undefined && toDayNum(d) < toDayNum(today) - 183) d = build(Number(today.slice(0, 4)) + 1);
+  return isDateStr(d) ? d : null;
 }
