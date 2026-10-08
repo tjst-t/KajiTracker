@@ -190,7 +190,7 @@
       "number": 12,
       "kind": "task",
       "title": "通知2：Cron で当日の家事を送り分ける",
-      "status": "in-progress",
+      "status": "done",
       "parent": "web-push-cron",
       "dependsOn": [
         "push-foundation"
@@ -200,12 +200,12 @@
       "labels": [],
       "body": "## 背景\n通知1（push-foundation）で作った sendPushToUser を使い、期限当日の家事を Web Push で知らせる。仕様は docs/spec.md「通知」、設計は docs/design.md「3. 通知」。期限の計算は src/shared/schedule.ts の evaluate、家事の取り出しは src/worker/chores/routes.ts の scheduleOf を参考に。wrangler.jsonc の triggers.crons は既に \"*/15 * * * *\"。src/worker/index.ts の scheduled() に足す（既にある purge はそのまま）。\n\n## 決まり（仕様）\n- 期限が今日（status === \"today\"）の家事だけ送る。遅れているものには送らない。しまった家事（archived_at）は除く。今日すでに記録があれば送らない（evaluate の結果が today でなくなるので自然に外れるはず）。\n- 送る相手：担当者がいれば担当者だけ、いなければ Family 全員。\n- 送る時刻：家事に notify_time があればそれ、無ければ相手（users.notify_time）の時刻。日本時間。Cron は15分ごとなので、いまの時刻帯 [HH:MM, HH:MM+15分) に入るものを送る。\n- 1人に同じ時刻帯で複数の家事があれば1通にまとめる（例「今日の家事：ゴミ出し・洗濯槽の掃除」）。Family が複数なら Family 名も入れる。\n- 送ったら notifications_sent（user_id, chore_id, due_on）に入れ、同じ期限で二度送らない。\n- 通知を押すと / を開く（payload に url: \"/\"）。\n\n## 作り方\n- 誰に・何を送るかを決める部分は純粋な関数（例 src/worker/push/plan.ts の planNotifications(入力データ, now)）に分け、テストを厚く書く：担当あり・なし、家事の時刻優先、時刻帯の境目（例 07:00 の家事は 07:00〜07:14 の実行で送り、07:15 では送らない）、日本時間の日付の変わり目（UTC 15:00）、まとめて1通、送信済みは送らない、遅れ・しまった家事は送らない。\n- scheduled からは DB から読み、plan を作り、送り、notifications_sent に入れる。scheduled のテストは cloudflare:test の createScheduledController 等を使うか、処理本体を関数に出してテストする。送信の fetch はモック。\n- README に、ローカルで Cron を手で起こす方法（wrangler dev の /__scheduled や --test-scheduled、Vite の開発サーバでのやり方）を書く。\n\n## 約束ごと\n- 日本語のコメント、既存の書き方に合わせる。npm test・npx tsc -b・npm run build を通す。ローカルの D1 を消さない。",
       "doneWhen": "planNotifications のテストで仕様の各場合が通り、scheduled を起こすと期限当日の家事が担当者（いなければ全員）に家事か人の時刻で1通にまとまって送られ、二度送らないことをテストで確かめている。npm test・tsc・build が通る",
-      "resolution": null,
+      "resolution": "Factory が取り込みました（factory/push-cron）",
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-07T15:30:48.884Z",
-      "updatedAt": "2026-10-07T23:54:01.563Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-08T00:00:32.557Z",
+      "closedAt": "2026-10-08T00:00:32.557Z",
       "extra": {}
     },
     {
