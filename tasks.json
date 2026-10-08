@@ -327,7 +327,7 @@
       "number": 16,
       "kind": "task",
       "title": "PWA：マニフェスト・アイコン・画面の殻のキャッシュ",
-      "status": "ready",
+      "status": "in-progress",
       "parent": "pwa",
       "dependsOn": [
         "push-ui"
@@ -341,7 +341,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-07T15:30:53.460Z",
-      "updatedAt": "2026-10-07T15:30:53.460Z",
+      "updatedAt": "2026-10-08T00:07:22.468Z",
       "closedAt": null,
       "extra": {}
     },
