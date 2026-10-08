@@ -401,7 +401,7 @@
       "number": 17,
       "kind": "bug",
       "title": "統計の期間に上限がなく、範囲外の週・月が出る",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [],
       "milestone": null,
@@ -413,7 +413,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-07T23:53:58.888Z",
-      "updatedAt": "2026-10-07T23:53:58.888Z",
+      "updatedAt": "2026-10-08T00:07:21.944Z",
       "closedAt": null,
       "extra": {}
     }
