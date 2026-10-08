@@ -443,7 +443,7 @@
       "number": 19,
       "kind": "task",
       "title": "表1：周期を文字で書く・読む（毎週 月・木 など）",
-      "status": "ready",
+      "status": "in-progress",
       "parent": "bulk-spreadsheet",
       "dependsOn": [],
       "milestone": null,
@@ -455,7 +455,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-08T04:57:36.233Z",
-      "updatedAt": "2026-10-08T04:57:36.233Z",
+      "updatedAt": "2026-10-08T04:57:38.420Z",
       "closedAt": null,
       "extra": {}
     },
