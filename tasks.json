@@ -504,6 +504,27 @@
       "updatedAt": "2026-10-08T05:32:48.026Z",
       "closedAt": "2026-10-08T05:32:48.026Z",
       "extra": {}
+    },
+    {
+      "id": "table-delete-and-rename",
+      "number": 22,
+      "kind": "task",
+      "title": "表で直す画面から削除できるようにし、「しまう」を「無効」に言い換える",
+      "status": "ready",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "normal",
+      "labels": [],
+      "body": "## 背景\nたくみさんの要望（2026-10-08）。(1) 表で直す画面（src/client/screens/ChoreTable.tsx、URL /chores/table、表の部品は src/client/components/Sheet）でも家事を削除したい。(2) 「しまう」が分かりにくいので「無効」にしたい。中身（chores.archived_at。記録は残り、今日の画面・一覧・通知から外れる）は変えず、言葉だけ変える。\n\n## やること\n### 1. 言い換え（画面に出る文字だけ。API の archived・列名 archived_at はそのまま）\n- 表の列「しまう」→「無効」。\n- 家事の一覧（src/client/screens/Chores.tsx）：「しまった家事も見る」→「無効の家事も見る」、印「しまってある」→「無効」。\n- 家事の詳細（src/client/screens/ChoreDetail.tsx）：ボタン「しまう」→「無効にする」、「元に戻す」→「有効に戻す」。見出しの「（しまってあります）」→「（無効になっています）」。知らせ「しまいました。一覧と通知から外れます」→「無効にしました。今日の画面・一覧・通知から外れます。記録は残ります」、「元に戻しました」→「有効に戻しました」。消すときの確認文の「「しまう」を使うと」→「「無効にする」を使うと」。\n- 統計（src/client/screens/Stats.tsx）の印「しまった」→「無効」。\n- コメント・docs/design.md・README の「しまう／しまった」も「無効」に揃える。テストの説明文やエラー文言で画面の文字を見ているものも直す（e2e/bulk-grid-flow.mjs など）。grep で「しま[うっいえ]」を探し、家事の archived の意味のものだけ直す（「入れてしまいます」のような普通の日本語は残す）。\n\n### 2. 表で直す画面から削除\n- 表の右端に「削除」の列（チェック）を足す。チェックした行は、行全体を薄くし取り消し線を引く（ほかのマスの変更より優先して「削除する」と分かるように）。範囲選択・Ctrl+Enter・元に戻すは、ほかのチェックの列（無効）と同じように効くこと。\n- 保存ボタンの文字は「○件の変更・△件の削除を保存」のように、削除の件数も分ける。\n- 削除が1件以上あるときは、保存の前に確認を出す：削除する家事の名前を並べ、「記録もすべて消え、元に戻せません。残したいときは『無効』にしてください」と書く。window.confirm でもダイアログでもよい。\n- API：PATCH /api/families/:fid/chores/bulk の本文に deleteIds?: string[] を足す。すべてその Family の家事か確かめ（違えば 400、bulk_invalid の rows に出す。index は deleteIds の中の位置で、どちらの配列か分かるように rows の要素に kind: \"delete\" を足す）。同じ id を変更と削除の両方に入れたら 400。変更と削除は1つの db.batch でまとめて（どれか失敗したら全部戻る）。返り値は { updated, deleted }。chores も deleteIds も空なら 400。最大件数は変更と削除を合わせて既存の BULK_EDIT_MAX。記録は外部キーの cascade で消える（DELETE /chores/:id と同じ）。\n- スマホ幅では表を出さない（いまのまま）。\n\n## 確かめ方\n- API のテスト（src/worker/chores/bulk-edit.test.ts に足す）：削除だけ・変更と削除を一緒に・よその Family の家事を消せない・同じ id を両方に入れると 400・不備があれば何も消えない・記録も消える。\n- e2e/bulk-grid-flow.mjs に足す：表で直すで2行の「削除」にチェック → 保存 → 確認で OK → 一覧から消える。言い換え後の文字（「無効」）で動くこと。\n- npx tsc -b・npm run build・npm test。ローカルの D1 を消さない。",
+      "doneWhen": "画面から「しまう」の言葉が消えて「無効」になり、表で直す画面で削除にチェックして保存すると確認のうえ家事が消える。API のテストと e2e が通り、tsc・build・test が通る",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-08T06:28:27.818Z",
+      "updatedAt": "2026-10-08T06:28:27.818Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
