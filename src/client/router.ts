@@ -4,6 +4,7 @@ export type Route =
   | { name: "chores" }
   | { name: "chore-new" }
   | { name: "chore-bulk" }
+  | { name: "chore-table" }
   | { name: "chore"; id: string }
   | { name: "chore-edit"; id: string }
   | { name: "stats" }
@@ -22,6 +23,8 @@ export function pathOf(r: Route): string {
       return "/chores/new";
     case "chore-bulk":
       return "/chores/bulk";
+    case "chore-table":
+      return "/chores/table";
     case "chore":
       return `/chores/${r.id}`;
     case "chore-edit":
@@ -39,6 +42,7 @@ export function routeOf(path: string): Route {
   let m: RegExpExecArray | null;
   if (path === "/chores/new") return { name: "chore-new" };
   if (path === "/chores/bulk") return { name: "chore-bulk" };
+  if (path === "/chores/table") return { name: "chore-table" };
   if ((m = /^\/chores\/([^/]+)\/edit$/.exec(path))) return { name: "chore-edit", id: m[1]! };
   if ((m = /^\/chores\/([^/]+)$/.exec(path))) return { name: "chore", id: m[1]! };
   if (path.startsWith("/chores")) return { name: "chores" };
@@ -55,4 +59,14 @@ export function tabOf(r: Route): "today" | "chores" | "stats" | "family" | "sett
   if (r.name === "family") return "family";
   if (r.name === "settings") return "settings";
   return "chores";
+}
+
+/** 保存していない変更があるときに出す確かめ（表で直す）。null なら確かめない */
+let leaveMessage: string | null = null;
+export function setLeaveGuard(message: string | null) {
+  leaveMessage = message;
+}
+/** この画面から離れてよいか。変更が残っていれば聞く */
+export function confirmLeave(): boolean {
+  return !leaveMessage || confirm(leaveMessage);
 }

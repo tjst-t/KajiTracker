@@ -1,5 +1,6 @@
 // まとめて登録の表（PC 幅）を本物のブラウザで通す：貼り付け・範囲に同じ値・角を引っぱって埋める・読めない周期の赤・
 // 日付のカレンダー・周期の選ぶ画面・登録。スマホ幅では1行ずつの画面のまま。
+// 表で直す：担当の列を範囲選択でまとめて同じ人にして保存する・保存しないで離れようとすると確かめる。
 // 開発サーバを起こしてから `npm run e2e`（別のポートなら E2E_ORIGIN=http://localhost:5191 node e2e/bulk-grid-flow.mjs）。
 import { execSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
@@ -20,13 +21,23 @@ const browser = await chromium.launch();
 const errors = [];
 let step = "";
 const ok = (s) => console.log(`ok: ${s}`);
+/** 次に出る確かめ（confirm）を「キャンセル」にする。ふだんは OK */
+let dismissNext = false;
+let lastDialog = "";
 
 async function device(viewport) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, locale: "ja-JP" });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => errors.push(`[${step}] page error: ${e.message}`));
   page.on("console", (m) => m.type() === "error" && !m.text().includes("status of 401") && errors.push(`[${step}] console: ${m.text()}`));
-  page.on("dialog", (d) => d.accept());
+  page.on("dialog", (d) => {
+    lastDialog = d.message();
+    if (dismissNext) {
+      dismissNext = false;
+      return d.dismiss();
+    }
+    return d.accept();
+  });
   const cdp = await ctx.newCDPSession(page);
   await cdp.send("WebAuthn.enable");
   await cdp.send("WebAuthn.addVirtualAuthenticator", {
@@ -204,6 +215,63 @@ try {
   await page.screenshot({ path: `${SHOTS}/38-grid-templates.png` });
   ok("範囲を選んで打ち Ctrl+Enter で3行に同じ名前、よくある家事は表の末尾に足される");
 
+  // ---- (9) 表で直す：3つの家事の担当を範囲選択で同じ人にして保存する ----
+  step = "table-edit";
+  await page.getByRole("button", { name: "家事", exact: true }).click();
+  await page.getByRole("button", { name: "表で直す" }).click();
+  await h1(page, "表で直す");
+  await grid.waitFor();
+  for (const r of [1, 2, 3]) await expectText(r, "assignee", "なし");
+  await page.mouse.move(...(await center(cell(1, "assignee"))));
+  await page.mouse.down();
+  await page.mouse.move(...(await center(cell(3, "assignee"))), { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.press("Enter");
+  await page.getByRole("dialog", { name: "1行目の担当を選ぶ" }).waitFor();
+  await popover.getByRole("option", { name: "たくみ" }).click();
+  for (const r of [1, 2, 3]) {
+    await expectText(r, "assignee", "たくみ");
+    if (!(await cell(r, "assignee").evaluate((e) => e.classList.contains("is-changed")))) throw new Error(`${r}行目の担当に変えた印が無い`);
+  }
+  if (await cell(1, "name").evaluate((e) => e.classList.contains("is-changed"))) throw new Error("変えていないマスに印が付いた");
+  await page.getByRole("button", { name: "3件の変更を保存" }).waitFor();
+  await page.mouse.click(10, 10);
+  await page.screenshot({ path: `${SHOTS}/39-table-edit.png` });
+
+  // 保存しないで離れようとすると確かめる。やめると残る
+  dismissNext = true;
+  await page.getByRole("button", { name: "家事", exact: true }).click();
+  if (!lastDialog.includes("保存していない変更")) throw new Error(`確かめが出ない: ${lastDialog}`);
+  await h1(page, "表で直す");
+  await expectText(2, "assignee", "たくみ");
+
+  // しまうのマスは押すと入り切りし、Ctrl+Z で戻る
+  await cell(3, "archived").click();
+  if (!(await cell(3, "archived").locator("input").isChecked())) throw new Error("しまうのマスを押してもチェックが入らない");
+  await page.getByRole("button", { name: "3件の変更を保存" }).waitFor();
+  await page.keyboard.press("ControlOrMeta+z");
+  if (await cell(3, "archived").locator("input").isChecked()) throw new Error("Ctrl+Z でしまうが戻らない");
+  // 選んであるマスをもう一度押しても1回だけ変わる
+  await cell(3, "archived").click();
+  if (!(await cell(3, "archived").locator("input").isChecked())) throw new Error("選んであるしまうのマスを押すと2回変わる");
+  await page.keyboard.press("ControlOrMeta+z");
+  if (await cell(3, "archived").locator("input").isChecked()) throw new Error("Ctrl+Z でしまうが戻らない（2回目）");
+
+  await page.getByRole("button", { name: "3件の変更を保存" }).click();
+  await page.getByText("3件の家事を保存しました").waitFor();
+  await page.getByRole("button", { name: "変更はありません" }).waitFor();
+  for (const r of [1, 2, 3]) await expectText(r, "assignee", "たくみ");
+  if (await page.locator(".bulk-grid__cell.is-changed").count()) throw new Error("保存したのに変えた印が残る");
+  lastDialog = "";
+  await page.getByRole("button", { name: "家事", exact: true }).click();
+  await h1(page, "家事");
+  if (lastDialog) throw new Error(`保存したあとなのに確かめが出た: ${lastDialog}`);
+  await page.getByRole("link", { name: "窓ふき" }).waitFor();
+  const who = await page.locator('td[data-label="担当"]').allInnerTexts();
+  if (who.length !== 3 || who.some((t) => t.trim() !== "たくみ")) throw new Error(`一覧の担当が「${who.join("、")}」`);
+  await page.screenshot({ path: `${SHOTS}/40-table-saved.png`, fullPage: true });
+  ok("表で直す：担当の3マスを範囲で選んで「たくみ」にし、保存すると一覧の3件とも担当がたくみになる（保存前に離れると確かめる）");
+
   // ---- (8) スマホ幅では1行ずつの画面 ----
   step = "phone";
   const phone = await ctx.newPage();
@@ -217,6 +285,12 @@ try {
   await phone.setViewportSize({ width: 1024, height: 844 });
   await phone.locator(".bulk-grid .dsg-container").waitFor();
   ok("スマホ幅では1行ずつの画面、広げると表になる");
+  await phone.setViewportSize({ width: 390, height: 844 });
+  await phone.goto(`${ORIGIN}/chores/table`);
+  await h1(phone, "表で直す");
+  await phone.getByText("表で直すのは PC で").waitFor();
+  if (await phone.locator(".bulk-grid").count()) throw new Error("スマホ幅なのに直す表が出る");
+  ok("スマホ幅の「表で直す」は PC で開くよう案内だけ出す");
 } catch (e) {
   console.log(`止まった場所: ${step}`);
   errors.push(String(e).split("\n").slice(0, 8).join("\n"));

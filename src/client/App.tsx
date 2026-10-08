@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, type Family, type Me, api } from "./api";
 import { takeFragmentFromUrl } from "./auth";
 import { errorText } from "./format";
@@ -11,10 +11,11 @@ import { StatsScreen } from "./screens/Stats";
 import { ChoreBulk } from "./screens/ChoreBulk";
 import { ChoreDetail } from "./screens/ChoreDetail";
 import { ChoreForm } from "./screens/ChoreForm";
+import { ChoreTable } from "./screens/ChoreTable";
 import { Chores } from "./screens/Chores";
 import { TicketScreen } from "./screens/Ticket";
 import { Today } from "./screens/Today";
-import { type Nav, type Route, pathOf, routeOf, tabOf } from "./router";
+import { type Nav, type Route, confirmLeave, pathOf, routeOf, tabOf } from "./router";
 
 // 札・招待はページを開いた瞬間に URL から抜いておく（描画より前に）
 const initialFragment = takeFragmentFromUrl();
@@ -37,8 +38,11 @@ export function App() {
   const [currentId, setCurrentId] = useState<string | null>(localStorage.getItem(FAMILY_KEY));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [route, setRoute] = useState<Route>(routeOf(location.pathname));
+  const routeRef = useRef(route);
+  routeRef.current = route;
 
   const selectFamily = (id: string | null) => {
+    if (!confirmLeave()) return;
     setCurrentId(id);
     if (id) localStorage.setItem(FAMILY_KEY, id);
     else localStorage.removeItem(FAMILY_KEY);
@@ -75,12 +79,17 @@ export function App() {
   }, [ticket, refreshMe]);
 
   useEffect(() => {
-    const onPop = () => setRoute(routeOf(location.pathname));
+    const onPop = () => {
+      // 保存していない変更を残して戻るのをやめたら、URL を元の画面に戻す
+      if (!confirmLeave()) return history.pushState(null, "", pathOf(routeRef.current));
+      setRoute(routeOf(location.pathname));
+    };
     addEventListener("popstate", onPop);
     return () => removeEventListener("popstate", onPop);
   }, []);
 
   const go = (r: Route) => {
+    if (!confirmLeave()) return;
     history.pushState(null, "", pathOf(r));
     setRoute(r);
     scrollTo(0, 0);
@@ -175,6 +184,8 @@ export function App() {
         <Chores family={family} nav={nav} />
       ) : route.name === "chore-bulk" ? (
         <ChoreBulk family={family} nav={nav} />
+      ) : route.name === "chore-table" ? (
+        <ChoreTable family={family} nav={nav} />
       ) : route.name === "chore-new" ? (
         <ChoreForm family={family} nav={nav} />
       ) : route.name === "chore-edit" ? (

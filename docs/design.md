@@ -255,6 +255,7 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
 
 - `GET /families/:fid/groups`、`POST /families/:fid/groups`、`PATCH /groups/:id`（名前・並び順）、`DELETE /groups/:id`（家事はグループなしに）
 - `POST /families/:fid/chores/bulk`（まとめて登録。1行でも不備があれば1件も入れず、`rows: [{index, message}]` を返す。100件まで）
+- `PATCH /families/:fid/chores/bulk`（表で直す。`{ chores: [{ id, name?, schedule?, groupId?, assigneeUserId?, notifyTime?, archived? }] }`。来なかった項目は変えない。よその Family の家事・不備が1行でもあれば1件も変えず `bulk_invalid` の 400。周期の基準日は `PATCH /chores/:id` と同じく引き継ぐ。200件まで）
 
 **統計**
 - `GET /families/:fid/stats?from=&to=`（日本時間の日付、両端を含む。省いた側は今月の初日・末日）。計算は `src/shared/stats.ts`

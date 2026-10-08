@@ -53,9 +53,11 @@ function scheduleColumns(input: unknown, today: DateStr, previous?: ChoreRow) {
   return fail(400, "周期の種類を選んでください");
 }
 
-async function validAssignee(c: Ctx, familyId: string, assignee: unknown): Promise<string | null> {
+/** 担当者を確かめる。known（先に引いたその Family の人の id）があれば DB を引かない */
+async function validAssignee(c: Ctx, familyId: string, assignee: unknown, known?: Set<string>): Promise<string | null> {
   if (assignee === null || assignee === undefined || assignee === "") return null;
   if (typeof assignee !== "string") fail(400, "担当者が正しくありません");
+  if (known) return known.has(assignee) ? assignee : fail(400, "担当者はこの Family の人から選んでください");
   const m = await c
     .get("db")
     .select()
@@ -179,7 +181,34 @@ async function buildChoreRow(c: Ctx, fid: string, userId: string, b: Partial<Cho
   };
 }
 
+type ChorePatch = Partial<ChoreInput> & { archived?: unknown };
+type FamilyRefs = { members: Set<string>; groups: Set<string> };
+
+/** その Family の人とグループの id（まとめて直すとき、行ごとに DB を引かないように） */
+async function familyRefs(c: Ctx, fid: string): Promise<FamilyRefs> {
+  const db = c.get("db");
+  const [m, g] = await Promise.all([
+    db.select({ id: familyMembers.userId }).from(familyMembers).where(eq(familyMembers.familyId, fid)).all(),
+    db.select({ id: choreGroups.id }).from(choreGroups).where(eq(choreGroups.familyId, fid)).all(),
+  ]);
+  return { members: new Set(m.map((r) => r.id)), groups: new Set(g.map((r) => r.id)) };
+}
+
+/** 家事1つへの変更を確かめ、chores の update に渡す値にする（まだ入れない）。来なかった項目は変えない */
+async function buildChorePatch(c: Ctx, chore: ChoreRow, b: ChorePatch, today: DateStr, refs?: FamilyRefs) {
+  const set: Partial<typeof chores.$inferInsert> = { updatedAt: nowIso() };
+  if (b.name !== undefined) set.name = validName(b.name);
+  // 毎週・毎月で基準日が来なければ、前の基準日を引き継ぐ
+  if (b.schedule !== undefined) Object.assign(set, scheduleColumns(b.schedule, today, chore));
+  if (b.assigneeUserId !== undefined) set.assigneeUserId = await validAssignee(c, chore.familyId, b.assigneeUserId, refs?.members);
+  if (b.groupId !== undefined) set.groupId = await validGroup(c, chore.familyId, b.groupId, refs?.groups);
+  if (b.notifyTime !== undefined) set.notifyTime = validChoreNotify(b.notifyTime);
+  if (b.archived !== undefined) set.archivedAt = b.archived ? (chore.archivedAt ?? nowIso()) : null;
+  return set;
+}
+
 const BULK_MAX = 100;
+const BULK_EDIT_MAX = 200;
 
 const strip = <T extends { _ev: unknown }>(v: T) => {
   const { _ev, ...rest } = v;
@@ -240,6 +269,40 @@ export const choreRoutes = new Hono<AppEnv>()
     await db.batch([first!, ...more]);
     return c.json({ created: rows.length, ids: rows.map((r) => r.id) }, 201);
   })
+  /** まとめて直す。1行でも不備があれば1つも変えず、不備のある行を返す（POST の bulk と同じ形） */
+  .patch("/families/:fid/chores/bulk", async (c) => {
+    const fid = c.req.param("fid");
+    await requireMember(c, fid);
+    const { chores: input } = await body<{ chores: (ChorePatch & { id?: unknown })[] }>(c);
+    if (!Array.isArray(input) || input.length === 0) fail(400, "直す家事がありません");
+    if (input.length > BULK_EDIT_MAX) fail(400, `一度に直せるのは ${BULK_EDIT_MAX} 件までです`);
+    const db = c.get("db");
+    const ids = [...new Set(input.map((b) => b?.id).filter((id): id is string => typeof id === "string"))];
+    const found = ids.length ? await db.select().from(chores).where(and(eq(chores.familyId, fid), inArray(chores.id, ids))).all() : [];
+    const byId = new Map(found.map((r) => [r.id, r]));
+    const refs = await familyRefs(c, fid);
+    const today = todayInTokyo();
+    const updates: { id: string; set: Awaited<ReturnType<typeof buildChorePatch>> }[] = [];
+    const errors: { index: number; message: string }[] = [];
+    const seen = new Set<string>();
+    for (const [index, b] of input.entries()) {
+      try {
+        // よその Family の家事も「ありません」にする（あるかどうかを漏らさない）
+        const chore = typeof b?.id === "string" ? byId.get(b.id) : undefined;
+        if (!chore) fail(400, "その家事はありません");
+        if (seen.has(chore.id)) fail(400, "同じ家事が2回あります");
+        seen.add(chore.id);
+        updates.push({ id: chore.id, set: await buildChorePatch(c, chore, b, today, refs) });
+      } catch (e) {
+        if (!(e instanceof HTTPException)) throw e;
+        errors.push({ index, message: e.message });
+      }
+    }
+    if (errors.length) return c.json({ error: `${errors.length}件の行に不備があります`, code: "bulk_invalid", rows: errors }, 400);
+    const [first, ...more] = updates.map((u) => db.update(chores).set(u.set).where(eq(chores.id, u.id)));
+    await db.batch([first!, ...more]);
+    return c.json({ updated: updates.length });
+  })
   .get("/chores/:id", async (c) => {
     const chore = await loadChore(c, c.req.param("id"));
     const { assigneeName, groupName } = await loadNamed(c, chore.id);
@@ -256,14 +319,8 @@ export const choreRoutes = new Hono<AppEnv>()
   })
   .patch("/chores/:id", async (c) => {
     const chore = await loadChore(c, c.req.param("id"));
-    const b = await body<ChoreInput & { archived: boolean }>(c);
-    const set: Partial<typeof chores.$inferInsert> = { updatedAt: nowIso() };
-    if (b.name !== undefined) set.name = validName(b.name);
-    if (b.schedule !== undefined) Object.assign(set, scheduleColumns(b.schedule, todayInTokyo(), chore));
-    if (b.assigneeUserId !== undefined) set.assigneeUserId = await validAssignee(c, chore.familyId, b.assigneeUserId);
-    if (b.groupId !== undefined) set.groupId = await validGroup(c, chore.familyId, b.groupId);
-    if (b.notifyTime !== undefined) set.notifyTime = validChoreNotify(b.notifyTime);
-    if (b.archived !== undefined) set.archivedAt = b.archived ? nowIso() : null;
+    const b = await body<ChorePatch>(c);
+    const set = await buildChorePatch(c, chore, b, todayInTokyo());
     await c.get("db").update(chores).set(set).where(eq(chores.id, chore.id));
     return c.json({ ok: true });
   })

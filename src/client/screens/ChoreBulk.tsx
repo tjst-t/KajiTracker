@@ -38,7 +38,7 @@ const isBlank = (r: Row) => !r.name.trim();
 
 /** PC 幅（41rem より広い）か。幅が変われば切り替わる */
 const WIDE_QUERY = "(min-width: 41.01rem)";
-function useWide() {
+export function useWide() {
   const [wide, setWide] = useState(() => matchMedia(WIDE_QUERY).matches);
   useEffect(() => {
     const mq = matchMedia(WIDE_QUERY);

@@ -22,10 +22,11 @@ async function loadGroup(c: Ctx, id: string) {
   return g;
 }
 
-/** 家事に付けるグループを確かめる。null・空ならグループ無し */
-export async function validGroup(c: Ctx, familyId: string, groupId: unknown): Promise<string | null> {
+/** 家事に付けるグループを確かめる。null・空ならグループ無し。known（先に引いたその Family のグループの id）があれば DB を引かない */
+export async function validGroup(c: Ctx, familyId: string, groupId: unknown, known?: Set<string>): Promise<string | null> {
   if (groupId === null || groupId === undefined || groupId === "") return null;
   if (typeof groupId !== "string") fail(400, "グループが正しくありません");
+  if (known) return known.has(groupId) ? groupId : fail(400, "グループはこの Family のものから選んでください");
   const g = await c
     .get("db")
     .select()

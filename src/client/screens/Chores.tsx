@@ -5,6 +5,7 @@ import type { ChoreView } from "../chores";
 import { Hanko } from "../components/Fuda";
 import { errorText } from "../format";
 import type { Nav } from "../router";
+import { useWide } from "./ChoreBulk";
 
 const NONE = "__none__";
 
@@ -15,7 +16,8 @@ export function Chores({ family, nav }: { family: Family; nav: Nav }) {
   const [filter, setFilter] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // まとめて登録から戻ってきたときの知らせ
+  const wide = useWide();
+  // まとめて登録・表で直すから戻ってきたときの知らせ
   const [flash] = useState(() => {
     const f = sessionStorage.getItem("kaji.flash");
     sessionStorage.removeItem("kaji.flash");
@@ -51,6 +53,11 @@ export function Chores({ family, nav }: { family: Family; nav: Nav }) {
       <div className="page-head">
         <h1>家事</h1>
         <div className="form-actions">
+          {wide && (
+            <button className="btn" onClick={() => nav.go({ name: "chore-table" })}>
+              表で直す
+            </button>
+          )}
           <button className="btn" onClick={() => nav.go({ name: "chore-bulk" })}>
             まとめて登録
           </button>
