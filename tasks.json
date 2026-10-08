@@ -146,7 +146,7 @@
       "number": 6,
       "kind": "story",
       "title": "通知：Web Push と Cron",
-      "status": "ready",
+      "status": "done",
       "parent": null,
       "dependsOn": [
         "item-2"
@@ -156,12 +156,12 @@
       "labels": [],
       "body": "docs/design.md の 3。Web Push のライブラリは @block65/webcrypto-web-push か PushForge を試して決める。",
       "doneWhen": "ローカルで --test-scheduled を叩くと、期限が今日の家事が担当者（いなければ全員）に、家事か人の時刻で1通にまとまって届く。二重に送らない",
-      "resolution": null,
+      "resolution": "タスク push-foundation・push-cron・push-ui を Factory で取り込み。手元で .dev.vars に VAPID 鍵を入れ、npm test 142 件と e2e（push-flow：購読の登録・SW の通知表示・オフで削除・拒否と iPhone の案内）を確認。実機での受信は PWA のストーリーで確かめる。",
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-06T02:51:10.678Z",
-      "updatedAt": "2026-10-06T02:51:28.446Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-08T00:19:38.141Z",
+      "closedAt": "2026-10-08T00:19:38.141Z",
       "extra": {}
     },
     {
