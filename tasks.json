@@ -464,7 +464,7 @@
       "number": 20,
       "kind": "task",
       "title": "表2：まとめて登録をエクセルのような表にする",
-      "status": "ready",
+      "status": "in-progress",
       "parent": "bulk-spreadsheet",
       "dependsOn": [
         "schedule-text"
@@ -478,7 +478,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-08T04:57:36.233Z",
-      "updatedAt": "2026-10-08T05:02:04.906Z",
+      "updatedAt": "2026-10-08T05:02:26.017Z",
       "closedAt": null,
       "extra": {}
     },
