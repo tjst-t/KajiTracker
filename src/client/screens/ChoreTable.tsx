@@ -306,7 +306,12 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
     cellOf: (r, field, disabled) => {
       const check = checks.get(r.id);
       const f = field as Field;
-      if (r.delete) return { rowError: rowErrors[r.id], changed: f === "delete" };
+      if (r.delete) {
+        // 削除する行は取り消し線だけ。日付は読める形で出す
+        const del = { rowError: rowErrors[r.id], changed: f === "delete" };
+        const d = f === "due" && r.due ? parseDateText(r.due, today) : null;
+        return d ? { ...del, shown: shortDate(d) } : del;
+      }
       const error = check?.errors[f];
       const out = { error, rowError: rowErrors[r.id], changed: check?.changed.has(f) };
       if (f === "notify" && !r.notify) return { ...out, shown: <span className="bulk-grid__hint">それぞれ</span> };
