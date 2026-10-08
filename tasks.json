@@ -213,7 +213,7 @@
       "number": 13,
       "kind": "task",
       "title": "通知3：Service Worker と「この端末で通知を受ける」の画面",
-      "status": "in-progress",
+      "status": "done",
       "parent": "web-push-cron",
       "dependsOn": [
         "push-foundation"
@@ -223,12 +223,12 @@
       "labels": [],
       "body": "## 背景\n通知1（push-foundation）の API（GET /api/push/vapid-public-key、POST/DELETE /api/push/subscriptions）を画面から使う。画面は React（src/client）、設定画面は src/client/screens/Settings.tsx、API 呼び出しは src/client/api.ts の api()（X-Kaji-Client ヘッダ付き）。見た目は src/client/styles.css の既存のクラス（.section .btn .notice .muted など）を使い、新しい色やフォントを足さない。\n\n## 決まり\n- Service Worker は public/sw.js に手で書く（vite-plugin-pwa は使わない。後の PWA のタスクで同じファイルにキャッシュを足す）。push を受けたら showNotification（title・body・data.url）、notificationclick で既存のウィンドウにフォーカスするか data.url を開く。\n- 画面の登録は src/client/main.tsx などで navigator.serviceWorker.register('/sw.js')。\n- 設定画面の「あなた」のところ（通知の時刻の近く）に「この端末で通知を受ける」のオン・オフ。オンで Notification.requestPermission → pushManager.subscribe（applicationServerKey は vapid の公開鍵）→ POST。オフで unsubscribe → DELETE。いまの状態（許可済み・拒否・未対応）を正しく表示。拒否されているときは、ブラウザの設定から許可する必要があることを書く。\n- iPhone・iPad（Safari）で、ホーム画面に追加していない（display-mode: standalone でない、navigator.standalone でない）ときは、通知の代わりに「ホーム画面に追加すると通知を受けられます。共有ボタン → ホーム画面に追加」の案内を出す（docs/design.md の S12）。\n- 文言は日本語、平易に、ユーザーの言葉で（「購読」ではなく「通知を受ける」）。\n\n## 確かめ方\n- npx tsc -b・npm run build・npm test が通ること。\n- 可能なら e2e/ に Playwright の確認を足す（既存の e2e/login-flow.mjs・e2e/chores-flow.mjs の書き方。開発サーバ npm run dev が要る）。Chromium で通知の許可を与え（context.grantPermissions(['notifications'])）、オンにすると購読が API に登録されることを確かめる。開発サーバを起こせない環境ならスキップしてよいが、その旨を結果に書く。\n- ローカルの D1 を消さない。",
       "doneWhen": "設定画面で通知のオン・オフができ、オンで購読が登録・オフで削除される。public/sw.js が push を受けて通知を出し、押すと画面を開く。iPhone でホーム画面に追加していなければ案内が出る。tsc・build・test が通る",
-      "resolution": null,
+      "resolution": "Factory が取り込みました（factory/push-ui）",
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-07T15:30:48.884Z",
-      "updatedAt": "2026-10-07T23:54:02.117Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-08T00:07:10.353Z",
+      "closedAt": "2026-10-08T00:07:10.353Z",
       "extra": {}
     },
     {
