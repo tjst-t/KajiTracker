@@ -416,6 +416,27 @@
       "updatedAt": "2026-10-08T00:11:23.570Z",
       "closedAt": "2026-10-08T00:11:23.570Z",
       "extra": {}
+    },
+    {
+      "id": "bulk-spreadsheet",
+      "number": 18,
+      "kind": "story",
+      "title": "まとめて登録を、エクセルのような表にする",
+      "status": "backlog",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "high",
+      "labels": [],
+      "body": "たくみさんの要望（2026-10-08）：まとめて登録（/chores/bulk）を本当の表にしたい。複数のマスを選んで同じ値をまとめて入れる、など。範囲は確認中。案は react-datasheet-grid（MIT、Excel との貼り付け・範囲選択・角を引っぱって埋める・キーボード操作）。",
+      "doneWhen": "",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-08T02:15:32.581Z",
+      "updatedAt": "2026-10-08T02:15:32.581Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
