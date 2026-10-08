@@ -327,7 +327,7 @@
       "number": 16,
       "kind": "task",
       "title": "PWA：マニフェスト・アイコン・画面の殻のキャッシュ",
-      "status": "in-progress",
+      "status": "done",
       "parent": "pwa",
       "dependsOn": [
         "push-ui"
@@ -337,12 +337,12 @@
       "labels": [],
       "body": "## 背景\nKajiTracker（React/Vite ＋ Cloudflare Workers）を PWA にしてホーム画面に置けるようにする。Service Worker は通知のタスクで public/sw.js として手で書いてある（push と notificationclick）。vite-plugin-pwa は使わない。\n\n## やること\n- public/manifest.webmanifest：name「KajiTracker」、short_name、start_url \"/\"、display \"standalone\"、background_color と theme_color は地の色 #F1F4F1、lang ja。index.html に link と apple-touch-icon、apple-mobile-web-app-* の meta。\n- アイコン：ワードマークの見立て（藍 #2F4F6F の地に白い「家」か「K」、右下に若竹 #4F7F5A の小さな丸）を SVG で作り、192・512・maskable 512・apple-touch-icon 180 の PNG を作る（作るスクリプトを scripts/ に置くか、作った PNG を public/icons/ に入れる。playwright が devDependencies にあるので、SVG を描いて screenshot で PNG にしてもよい）。\n- public/sw.js に画面の殻のキャッシュを足す：install でビルドされた index.html を入れ、ナビゲーションはネット優先・落ちたらキャッシュ。/api/* はキャッシュしない（ログインや家事のデータを古いまま見せない）。ハッシュ付きの /assets/* は cache-first。版を上げたら古いキャッシュを消す。既存の push の処理は壊さない。\n- 開発サーバ（vite）で Service Worker が邪魔をしないこと（開発中はキャッシュを使わないなど）。\n- wrangler.jsonc の assets で sw.js と manifest が正しい Content-Type で配られ、sw.js がキャッシュされすぎない（Cache-Control）ことを確かめる。public/_headers に既に frame-ancestors などがある。\n\n## 確かめ方\n- npm run build のあと、Playwright（devDependencies にある）で npm run preview の画面を開き、manifest が読め、Service Worker が登録され、オフラインにしても / が開くことを確かめるスクリプトを e2e/ に足す。環境で起こせなければ、その旨を結果に書く。\n- npx tsc -b・npm run build・npm test が通ること。ローカルの D1 を消さない。",
       "doneWhen": "manifest とアイコンが配られ、Chromium の確認でインストール可能（manifest が有効・SW 登録済み）で、オフラインでも / の殻が開き、/api はキャッシュされない。通知の push 処理が壊れていない。tsc・build・test が通る",
-      "resolution": null,
+      "resolution": "Factory が取り込みました（factory/pwa-install）",
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-07T15:30:53.460Z",
-      "updatedAt": "2026-10-08T00:07:22.468Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-08T00:13:11.479Z",
+      "closedAt": "2026-10-08T00:13:11.479Z",
       "extra": {}
     },
     {
