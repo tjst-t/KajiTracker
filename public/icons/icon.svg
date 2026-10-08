@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- KajiTracker のアイコン：藍の地に白い K、右下に若竹の小さな丸（ワードマークの「済み」の印） -->
+  <rect width="512" height="512" fill="#2F4F6F"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="48" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M160 146 V366"/>
+    <path d="M292 146 L170 262 L298 366"/>
+  </g>
+  <circle cx="364" cy="354" r="26" fill="#4F7F5A"/>
+</svg>

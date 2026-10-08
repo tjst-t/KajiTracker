@@ -10,11 +10,14 @@ import { ApiError, api } from "./api";
  */
 export type PushState = "unsupported" | "needs-home-screen" | "denied" | "off" | "on";
 
+/** 開発サーバでは "?dev" を付けて登録し、Service Worker にキャッシュを使わせない（public/sw.js） */
+const SW_URL = import.meta.env.DEV ? "/sw.js?dev" : "/sw.js";
+
 /** 画面を開いたときに Service Worker を登録する */
 export function registerServiceWorker(): void {
   if (!("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("service worker の登録に失敗しました", e));
+    navigator.serviceWorker.register(SW_URL).catch((e) => console.warn("service worker の登録に失敗しました", e));
   });
 }
 
@@ -58,7 +61,7 @@ export async function turnOnPush(): Promise<PushState> {
   const permission = await Notification.requestPermission();
   if (permission === "denied") return "denied";
   if (permission !== "granted") return "off";
-  const reg = await navigator.serviceWorker.register("/sw.js");
+  const reg = await navigator.serviceWorker.register(SW_URL);
   await navigator.serviceWorker.ready;
   const { publicKey } = await api<{ publicKey: string }>("GET", "/push/vapid-public-key");
   const sub =
