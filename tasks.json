@@ -487,7 +487,7 @@
       "number": 21,
       "kind": "task",
       "title": "表3：登録済みの家事を表でまとめて直す",
-      "status": "in-progress",
+      "status": "done",
       "parent": "bulk-spreadsheet",
       "dependsOn": [
         "bulk-grid"
@@ -497,12 +497,12 @@
       "labels": [],
       "body": "## 背景\n表2（bulk-grid）で作った表の部品を使い、登録済みの家事を表でまとめて直せるようにする（例：担当を一気に変える、グループを付け直す、周期を直す）。家事の API は src/worker/chores/routes.ts、グループは src/worker/chores/groups.ts。\n\n## やること\n- API PATCH /api/families/:fid/chores/bulk：{ chores: [{ id, name?, schedule?, groupId?, assigneeUserId?, notifyTime?, archived? }] }。全部の家事がその Family のものか確かめ、1行でも不備があれば1件も変えず 400（code: bulk_invalid、rows: [{index, message}]。POST の bulk と同じ形）。変えるときは db.batch。周期を変えたときの基準日の扱いは PATCH /chores/:id と同じ（scheduleColumns に previous を渡す）。最大 200 件。\n- 画面：URL /chores/table（router.ts に足す）。「家事」の画面（src/client/screens/Chores.tsx）に「表で直す」ボタン（PC 幅のときだけ出す）。表の列：家事の名前・グループ・周期・次の期限（日数の周期のとき。変えると最初の期限＝次の期限として送る。PATCH /chores/:id の編集画面と同じ考え）・担当・通知の時刻・しまう（チェック）。行は全部の家事（しまったものも、しまうの列で分かる）。\n- 変えたマスに印を付け、「○件の変更を保存」で変えた行だけ送る。保存しないで離れようとしたら確かめる。\n- 行の追加・削除はしない（追加はまとめて登録、削除は詳細から）。\n- スマホ幅では「表で直すのは PC で」と案内だけ出す。\n\n## 確かめ方\n- API のテスト（test/client.ts を使う：まとめて変更・不備で1件も変わらない・よその Family の家事を含むと 404 か 400・基準日の引き継ぎ）。\n- e2e/bulk-grid-flow.mjs に足す：家事3つの担当の列を範囲選択で同じ人にして保存すると反映される。\n- npx tsc -b・npm run build・npm test。ローカルの D1 を消さない。",
       "doneWhen": "表で複数の家事の担当・グループ・周期などを直して一度に保存でき、不備があれば1件も変わらないことがテストで、範囲選択で担当をまとめて変える操作が e2e で確かめられる。tsc・build・test が通る",
-      "resolution": null,
+      "resolution": "Factory が取り込みました（factory/bulk-edit）",
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-08T04:57:36.233Z",
-      "updatedAt": "2026-10-08T05:19:54.965Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-08T05:32:48.026Z",
+      "closedAt": "2026-10-08T05:32:48.026Z",
       "extra": {}
     }
   ]
