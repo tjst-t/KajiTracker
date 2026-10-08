@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { type DateStr, todayInTokyo } from "../../shared/date";
 import { shortDate } from "../../shared/describe";
-import { type Stats, monthRange } from "../../shared/stats";
+import { STATS_MIN_DATE, type Stats, monthRange } from "../../shared/stats";
 import { type Family, api } from "../api";
 import { errorText } from "../format";
 
@@ -18,7 +18,7 @@ type Period = (typeof PERIODS)[number][0];
 function rangeOf(p: Period, today: DateStr): { from: DateStr; to: DateStr } {
   const month = monthRange(today);
   if (p === "month") return month;
-  if (p === "all") return { from: "2000-01-01", to: month.to };
+  if (p === "all") return { from: STATS_MIN_DATE, to: month.to };
   const [y, m] = today.split("-").map(Number) as [number, number];
   const back = new Date(Date.UTC(y, m - 1 - 2, 1)).toISOString().slice(0, 10);
   return { from: back, to: month.to };

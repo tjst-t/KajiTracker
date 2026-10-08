@@ -109,6 +109,14 @@ describe("統計（期間・しまった家事）", () => {
     expect(s.lateRanking[0]).toMatchObject({ name: "植木の水やり", averageDaysLate: 3.5, score: 3.5 });
   });
 
+  it("期間が最初の記録・期限より前で終わるとき、期間の外の週・月を出さない", () => {
+    const s = computeStats(input({ from: "2000-01-01", to: "2000-12-31" }));
+    expect(s.totalCount).toBe(0);
+    expect(s.weekly).toEqual([{ weekStart: "2000-12-25", count: 0 }]); // 12-31（日）を含む週
+    expect(s.monthly).toEqual([{ month: "2000-12", count: 0 }]);
+    expect(s.weekly.every((w) => w.weekStart <= "2000-12-31")).toBe(true);
+  });
+
   it("しまった家事は、しまった日より後の予定日を数えない", () => {
     const archivedY = chores.map((c) => (c.id === "y" ? { ...c, archivedOn: "2026-10-12" } : c));
     const s = computeStats(input({ chores: archivedY }));

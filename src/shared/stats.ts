@@ -73,6 +73,9 @@ export type Stats = {
 
 export const RANKING_SIZE = 10;
 
+/** 統計の期間の始めにできるいちばん古い日（「全期間」はここから）。推移を1日ずつ数えるので、期間の長さをこれと今日で抑える */
+export const STATS_MIN_DATE: DateStr = "2000-01-01";
+
 const round1 = (x: number) => Math.round(x * 10) / 10;
 const percent = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 
@@ -153,8 +156,9 @@ export function computeStats(input: StatsInput): Stats {
 
   // ---- 推移 ----
   const first = firstActivity(chores, live);
-  const start = toDayNum(first !== null && first > from ? first : from);
-  const end = Math.max(start, toDayNum(to));
+  // 最初の記録・期限が期間より後でも、期間の外（to より後）の週・月は出さない
+  const end = toDayNum(to);
+  const start = Math.min(toDayNum(first !== null && first > from ? first : from), end);
   const weekCount = new Map<DayNum, number>();
   const monthCount = new Map<string, number>();
   for (let w = mondayOf(start); w <= end; w += 7) weekCount.set(w, 0);

@@ -7,19 +7,25 @@ import { chores, familyMembers, logs, users } from "../db/schema";
 import { requireMember } from "../families/routes";
 import { scheduleOf } from "../chores/routes";
 import { isDateStr, todayInTokyo } from "../../shared/date";
-import { type StatsUser, computeStats, monthRange } from "../../shared/stats";
+import { STATS_MIN_DATE, type StatsUser, computeStats, monthRange } from "../../shared/stats";
 
 export const statsRoutes = new Hono<AppEnv>()
-  /** ?from=YYYY-MM-DD&to=YYYY-MM-DD（日本時間、両端を含む）。省いた側は今月の初日・末日 */
+  /**
+   * ?from=YYYY-MM-DD&to=YYYY-MM-DD（日本時間、両端を含む）。省いた側は今月の初日・末日。
+   * to は今日までに丸める（先の日は記録も判定も無い）。from は STATS_MIN_DATE より前なら断る
+   */
   .get("/families/:fid/stats", async (c) => {
     const fid = c.req.param("fid");
     await requireMember(c, fid);
     const today = todayInTokyo();
     const month = monthRange(today);
     const from = c.req.query("from") || month.from;
-    const to = c.req.query("to") || month.to;
-    if (!isDateStr(from) || !isDateStr(to)) fail(400, "期間を日付（YYYY-MM-DD）で入れてください");
-    if (from > to) fail(400, "期間の始めが終わりより後になっています");
+    const rawTo = c.req.query("to") || month.to;
+    if (!isDateStr(from) || !isDateStr(rawTo)) fail(400, "期間を日付（YYYY-MM-DD）で入れてください");
+    if (from > rawTo) fail(400, "期間の始めが終わりより後になっています");
+    if (from < STATS_MIN_DATE) fail(400, `期間の始めは ${STATS_MIN_DATE} 以降にしてください`);
+    if (from > today) fail(400, "期間の始めが今日より後になっています");
+    const to = rawTo < today ? rawTo : today;
 
     const db = c.get("db");
     const [members, choreRows, logRows] = await Promise.all([

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addDays, todayInTokyo, toDayNum, weekdayOf } from "../../shared/date";
-import { monthRange } from "../../shared/stats";
+import { STATS_MIN_DATE, monthRange } from "../../shared/stats";
 import { TestDevice, bootstrapUser } from "../../../test/client";
 
 const today = () => todayInTokyo();
@@ -79,14 +79,29 @@ describe("統計の API", () => {
     const { takumi, fam } = await family();
     const r = await takumi.get(`/api/families/${fam.id}/stats`);
     expect(r.status).toBe(200);
-    expect(r.json).toMatchObject({ ...monthRange(today()), totalCount: 0, lateRanking: [] });
+    // 終わりは今日までに丸める
+    expect(r.json).toMatchObject({ from: monthRange(today()).from, to: today(), totalCount: 0, lateRanking: [] });
     expect(r.json.people).toHaveLength(2);
+  });
+
+  it("先の to は今日までに丸め、推移も今日の週・月で終わる", async () => {
+    const { takumi, fam } = await family();
+    const r = await takumi.get(`/api/families/${fam.id}/stats?from=${STATS_MIN_DATE}&to=9999-12-31`);
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ from: STATS_MIN_DATE, to: today() });
+    const weeks: { weekStart: string }[] = r.json.weekly;
+    expect(weeks.at(-1)!.weekStart <= today() && today() < addDays(weeks.at(-1)!.weekStart, 7)).toBe(true);
+    expect(r.json.monthly.at(-1).month).toBe(today().slice(0, 7));
   });
 
   it("おかしな期間は断り、メンバーでなければ 404", async () => {
     const { takumi, fam } = await family();
     expect((await takumi.get(`/api/families/${fam.id}/stats?from=2026/10/01`)).status).toBe(400);
     expect((await takumi.get(`/api/families/${fam.id}/stats?from=2026-10-10&to=2026-10-01`)).status).toBe(400);
+    expect((await takumi.get(`/api/families/${fam.id}/stats?from=2026-02-30`)).status).toBe(400);
+    expect((await takumi.get(`/api/families/${fam.id}/stats?from=1999-12-31&to=2026-10-01`)).status).toBe(400);
+    expect((await takumi.get(`/api/families/${fam.id}/stats?from=0001-01-01&to=9999-12-31`)).status).toBe(400);
+    expect((await takumi.get(`/api/families/${fam.id}/stats?from=${addDays(today(), 1)}&to=9999-12-31`)).status).toBe(400);
     const stranger = await bootstrapUser("他人");
     const r = await stranger.get(`/api/families/${fam.id}/stats`);
     expect(r.status).toBe(404);
