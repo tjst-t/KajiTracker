@@ -7,6 +7,7 @@ import { FamilyScreen } from "./screens/FamilyScreen";
 import { InviteScreen } from "./screens/Invite";
 import { Login } from "./screens/Login";
 import { Settings } from "./screens/Settings";
+import { StatsScreen } from "./screens/Stats";
 import { ChoreBulk } from "./screens/ChoreBulk";
 import { ChoreDetail } from "./screens/ChoreDetail";
 import { ChoreForm } from "./screens/ChoreForm";
@@ -21,6 +22,7 @@ const initialFragment = takeFragmentFromUrl();
 const TABS = [
   ["today", "今日"],
   ["chores", "家事"],
+  ["stats", "統計"],
   ["family", "家族"],
   ["settings", "設定"],
 ] as const;
@@ -167,6 +169,8 @@ export function App() {
         <Settings me={me} onChanged={refreshMe} onLoggedOut={() => setMe(null)} />
       ) : route.name === "family" ? (
         <FamilyScreen me={me} family={family} onFamiliesChanged={loadFamilies} />
+      ) : route.name === "stats" ? (
+        <StatsScreen family={family} />
       ) : route.name === "chores" ? (
         <Chores family={family} nav={nav} />
       ) : route.name === "chore-bulk" ? (

@@ -3,6 +3,7 @@ import { describeSchedule, shortDate } from "../../shared/describe";
 import { api } from "../api";
 import type { ChoreDetail as Detail } from "../chores";
 import { Hanko } from "../components/Fuda";
+import { HistoryCalendar } from "../components/HistoryCalendar";
 import { errorText } from "../format";
 import type { Nav } from "../router";
 
@@ -112,10 +113,13 @@ export function ChoreDetail({ id, nav }: { id: string; nav: Nav }) {
 
       <section className="section" aria-labelledby="d-history">
         <h2 id="d-history">これまで</h2>
+        {(c.logs.length > 0 || c.cycles.length > 0) && (
+          <HistoryCalendar logs={c.logs} cycles={c.cycles} dueOn={c.archived ? null : c.dueOn} overdue={c.status === "overdue"} today={c.today} />
+        )}
         {c.logs.length === 0 ? (
           <p className="muted">まだ記録がありません。</p>
         ) : (
-          <ul className="list">
+          <ul className="list" aria-label="記録の一覧">
             {c.logs.map((l) => (
               <li key={l.id} className="list__item">
                 <p className="list__title">

@@ -1082,3 +1082,354 @@ select {
   .chore-table .c-who { width: 11%; }
   .chore-table .c-last { width: 22%; }
 }
+
+/* ---- 統計 ---- */
+
+.stats__period {
+  margin-bottom: 0.75rem;
+}
+.stats__range {
+  color: var(--ink-soft);
+  font-size: var(--t-small);
+}
+.stats__headline {
+  margin-bottom: 0.75rem;
+}
+.stats__headline b {
+  font-size: var(--t-mark);
+  font-weight: 900;
+  line-height: 1;
+  margin-right: 0.125rem;
+}
+.swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 3px;
+  margin-right: 0.375rem;
+  vertical-align: -0.05em;
+  flex: none;
+}
+
+/* 横棒：名前・棒・数を1行に。スマホでは名前と数の下に棒 */
+.hbars,
+.bias,
+.ranking {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hbars__row {
+  display: grid;
+  grid-template-columns: minmax(6rem, 10rem) 1fr auto;
+  grid-template-areas: "label track value";
+  align-items: center;
+  gap: 0.25rem 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.hbars__label {
+  grid-area: label;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.hbars__value {
+  grid-area: value;
+  white-space: nowrap;
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+}
+.hbars__value b {
+  font-size: var(--t-h2);
+  color: var(--ink);
+}
+.hbars__track {
+  grid-area: track;
+  display: block;
+  height: 0.875rem;
+  background: var(--ground);
+  border-radius: 0 4px 4px 0;
+}
+.hbars__track--thin {
+  height: 0.5rem;
+  margin: 0.25rem 0;
+}
+.hbars__bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+  background: var(--ai);
+}
+.hbars__bar--late {
+  background: var(--shu);
+}
+@media (max-width: 40rem) {
+  .hbars__row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "label value"
+      "track track";
+  }
+}
+
+/* 積み上げの帯：区切りに 2px のすき間 */
+.stack-bar {
+  display: flex;
+  gap: 2px;
+  height: 0.875rem;
+  margin: 0.25rem 0;
+  max-width: 32rem;
+}
+.stack-bar > span {
+  flex-basis: 0;
+  min-width: 2px;
+}
+.stack-bar > span:last-child {
+  border-radius: 0 4px 4px 0;
+}
+.stack-bar--punct {
+  height: 1.125rem;
+  margin-top: 1.25rem;
+}
+.is-ontime {
+  background: var(--wakatake);
+}
+.is-late {
+  background: #dfa597; /* 朱を薄めたもの：遅れてもやった */
+}
+.is-missed {
+  background: var(--shu);
+}
+.bias__row {
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.bias__name {
+  margin: 0;
+  font-weight: 500;
+}
+.bias__who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem 1rem;
+  margin: 0;
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+}
+.bias__who > span {
+  white-space: nowrap;
+}
+
+/* 縦の棒グラフ（推移） */
+.columns {
+  margin: 0 0 1.5rem;
+}
+.columns__title {
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+.columns__plot {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  height: 10rem;
+  max-width: 48rem;
+  border-bottom: 1px solid var(--ink-soft);
+  padding-bottom: 0;
+}
+.columns__col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  min-width: 0;
+  padding-top: 1.25rem; /* 数を書く場所 */
+}
+.columns__num {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.25rem;
+  white-space: nowrap;
+}
+.columns__bar {
+  display: block;
+  background: var(--ai);
+  border-radius: 4px 4px 0 0;
+  max-width: 3rem;
+  width: 100%;
+  margin-inline: auto;
+}
+.columns__bar.is-zero {
+  height: 0;
+}
+.columns__col:hover .columns__bar {
+  background: var(--ai-deep);
+}
+.columns__label {
+  position: absolute;
+  top: 100%;
+  left: -1rem;
+  right: -1rem;
+  text-align: center;
+  font-size: 0.6875rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  line-height: 1.5rem;
+}
+.columns__plot {
+  margin-bottom: 1.5rem;
+}
+
+/* よく遅れる家事 */
+.ranking__row {
+  display: flex;
+  gap: 0.875rem;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.ranking__rank {
+  flex: none;
+  width: 1.75rem;
+  font-size: var(--t-h2);
+  font-weight: 900;
+  color: var(--shu);
+  text-align: right;
+  line-height: 1.4;
+}
+.ranking__body {
+  flex: 1;
+  min-width: 0;
+  max-width: 32rem;
+}
+.ranking__name {
+  margin: 0;
+  font-weight: 700;
+}
+.ranking__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+  margin: 0;
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+}
+
+/* ---- 家事の詳細：実施カレンダー ---- */
+
+.hcal {
+  margin-bottom: 1.5rem;
+}
+.hcal__legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+}
+.hcal__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.hcal__legend .hcal__day {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.75rem;
+}
+.hcal__months {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 1rem 2rem;
+  margin-bottom: 0.75rem;
+}
+.hcal__month {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 22rem;
+  table-layout: fixed;
+}
+.hcal__month caption {
+  text-align: left;
+  font-weight: 700;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0.25rem;
+}
+.hcal__month th {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  padding: 0.25rem 0;
+}
+.hcal__month td {
+  text-align: center;
+  padding: 2px 0;
+}
+.hcal__day {
+  display: inline-grid;
+  place-items: center;
+  width: 2.125rem;
+  height: 2.125rem;
+  border-radius: 50%;
+  font-size: var(--t-small);
+  line-height: 1;
+  position: relative;
+}
+.hcal__day.is-today {
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.hcal__day.is-done {
+  background: var(--wakatake);
+  color: #fff;
+  font-weight: 700;
+}
+.hcal__day[class*="due-"] {
+  box-shadow: inset 0 0 0 2px var(--ai);
+}
+.hcal__day.is-done[class*="due-"] {
+  /* やった日と予定日が重なる：輪を外に出す */
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ai);
+}
+.hcal__day.due-late {
+  box-shadow: inset 0 0 0 2px var(--shu);
+}
+.hcal__day.is-done.due-late {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--shu);
+}
+.hcal__day.due-missed {
+  box-shadow: inset 0 0 0 2px var(--shu);
+  color: var(--shu);
+  background: var(--shu-tint);
+}
+.hcal__day.due-missed::after {
+  /* やらずに過ぎた：斜線 */
+  content: "";
+  position: absolute;
+  inset: 50% 15% auto;
+  border-top: 2px solid var(--shu);
+  transform: rotate(-45deg);
+}
+.hcal__day.due-next {
+  box-shadow: inset 0 0 0 2px var(--ai);
+  border: 0;
+  outline: 2px dashed var(--ai);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+@media (max-width: 40rem) {
+  .hcal__month {
+    max-width: none;
+  }
+}

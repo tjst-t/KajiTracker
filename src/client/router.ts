@@ -6,6 +6,7 @@ export type Route =
   | { name: "chore-bulk" }
   | { name: "chore"; id: string }
   | { name: "chore-edit"; id: string }
+  | { name: "stats" }
   | { name: "family" }
   | { name: "settings" };
 
@@ -25,6 +26,8 @@ export function pathOf(r: Route): string {
       return `/chores/${r.id}`;
     case "chore-edit":
       return `/chores/${r.id}/edit`;
+    case "stats":
+      return "/stats";
     case "family":
       return "/family";
     case "settings":
@@ -39,14 +42,16 @@ export function routeOf(path: string): Route {
   if ((m = /^\/chores\/([^/]+)\/edit$/.exec(path))) return { name: "chore-edit", id: m[1]! };
   if ((m = /^\/chores\/([^/]+)$/.exec(path))) return { name: "chore", id: m[1]! };
   if (path.startsWith("/chores")) return { name: "chores" };
+  if (path.startsWith("/stats")) return { name: "stats" };
   if (path.startsWith("/family")) return { name: "family" };
   if (path.startsWith("/settings")) return { name: "settings" };
   return { name: "today" };
 }
 
-/** タブ（今日・家事・家族・設定）のどれに当たるか */
-export function tabOf(r: Route): "today" | "chores" | "family" | "settings" {
+/** タブ（今日・家事・統計・家族・設定）のどれに当たるか */
+export function tabOf(r: Route): "today" | "chores" | "stats" | "family" | "settings" {
   if (r.name === "today") return "today";
+  if (r.name === "stats") return "stats";
   if (r.name === "family") return "family";
   if (r.name === "settings") return "settings";
   return "chores";

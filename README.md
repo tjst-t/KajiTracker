@@ -17,7 +17,7 @@ npm run db:reset:local     # ローカルの D1 を空に戻す（ログイン�
 npm run e2e                # 本物のブラウザ（Chromium）と仮想パスキーでログインの流れを通す
 ```
 
-`npm run e2e` は開発サーバを起こしてから。初回は `npx playwright install --with-deps chromium`。
+`npm run e2e` は開発サーバを起こしてから（統計と実施カレンダーは `e2e/stats-flow.mjs`）。初回は `npx playwright install --with-deps chromium`。
 開発サーバを別の URL（banto の公開など）から開くときは、`.dev.vars` の `ORIGINS` にその URL を足す。
 
 テーブルを変えたら `src/worker/db/schema.ts` を直して `npm run db:generate`。
