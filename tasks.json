@@ -280,7 +280,7 @@
       "number": 15,
       "kind": "task",
       "title": "統計2：統計の画面と、家事の詳細の実施カレンダー",
-      "status": "in-progress",
+      "status": "done",
       "parent": "item-3",
       "dependsOn": [
         "stats-api"
@@ -290,12 +290,12 @@
       "labels": [],
       "body": "## 背景\n統計1（stats-api）の GET /api/families/:fid/stats を画面にする。画面は React（src/client）。タブは src/client/App.tsx の TABS と src/client/router.ts（今日・家事・家族・設定）。見た目の約束：地 #F1F4F1、文字 #22302C、操作 藍 #2F4F6F、済み 若竹 #4F7F5A、遅れ 朱 #B8432F、字は Zen Maru Gothic だけ、1列・左寄せ、カードは使わず見出しと細線で区切る（src/client/styles.css の変数とクラスを使う）。今日の画面は「当番表・当番札・判子」の見立て。\n\n## やること\n- タブに「統計」を足す（今日・家事・統計・家族・設定）。URL /stats。スマホは画面下の固定タブに5つ並ぶので、幅が足りるか確かめる。\n- 統計の画面：期間の切り替え（今月・3か月・全期間）。分担（人ごとの回数と割合を横棒で）、担当の偏り（家事ごとの人別）、守れた率と平均の遅れ、週・月の推移（棒グラフ）、よく遅れる家事のランキング。グラフはライブラリを入れず SVG か CSS で。数字の羅列にせず、ひと目で分かること優先。色だけに頼らず数値も出す（アクセシビリティ）。データが少ないときの空の表示も。\n- 家事の詳細（src/client/screens/ChoreDetail.tsx）の「これまで」に、実施履歴のカレンダー表示（月ごとのマス、やった日に印、予定日・やらずに過ぎた回も分かる）を足す。データは GET /api/chores/:id の logs・cycles にある。\n- スマホ幅（390px）と PC 幅（1280px）の両方で崩れないこと。\n\n## 確かめ方\n- npx tsc -b・npm run build・npm test が通ること。\n- 可能なら e2e/ に Playwright の確認を足し（既存の e2e/chores-flow.mjs の書き方、開発サーバが要る）、スクリーンショットを e2e/screenshots/ に撮って見た目を自分で確かめる。開発サーバを起こせない環境ならスキップしてよいが、その旨を結果に書く。\n- ローカルの D1 を消さない。",
       "doneWhen": "統計のタブと画面があり、期間を切り替えると分担・守れた率・推移・ランキングが出る。家事の詳細に実施カレンダーが出る。スマホ幅と PC 幅で崩れない。tsc・build・test が通る",
-      "resolution": null,
+      "resolution": "Factory が取り込みました（factory/stats-ui）",
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-07T15:30:51.183Z",
-      "updatedAt": "2026-10-07T23:54:02.638Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-08T00:02:52.264Z",
+      "closedAt": "2026-10-08T00:02:52.264Z",
       "extra": {}
     },
     {
