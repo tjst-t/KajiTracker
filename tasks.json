@@ -531,7 +531,7 @@
       "number": 23,
       "kind": "task",
       "title": "家事の追加・修正・削除を1つの表の画面にまとめる",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [],
       "milestone": null,
@@ -543,7 +543,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-09T23:41:57.238Z",
-      "updatedAt": "2026-10-09T23:41:57.238Z",
+      "updatedAt": "2026-10-09T23:42:05.170Z",
       "closedAt": null,
       "extra": {}
     }
