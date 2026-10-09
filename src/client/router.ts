@@ -3,7 +3,6 @@ export type Route =
   | { name: "today" }
   | { name: "chores" }
   | { name: "chore-new" }
-  | { name: "chore-bulk" }
   | { name: "chore-table" }
   | { name: "chore"; id: string }
   | { name: "chore-edit"; id: string }
@@ -21,8 +20,6 @@ export function pathOf(r: Route): string {
       return "/chores";
     case "chore-new":
       return "/chores/new";
-    case "chore-bulk":
-      return "/chores/bulk";
     case "chore-table":
       return "/chores/table";
     case "chore":
@@ -41,8 +38,8 @@ export function pathOf(r: Route): string {
 export function routeOf(path: string): Route {
   let m: RegExpExecArray | null;
   if (path === "/chores/new") return { name: "chore-new" };
-  if (path === "/chores/bulk") return { name: "chore-bulk" };
-  if (path === "/chores/table") return { name: "chore-table" };
+  // 前の「まとめて登録」の URL は表で編集へ（App が URL も書き換える）
+  if (path === "/chores/table" || path === "/chores/bulk") return { name: "chore-table" };
   if ((m = /^\/chores\/([^/]+)\/edit$/.exec(path))) return { name: "chore-edit", id: m[1]! };
   if ((m = /^\/chores\/([^/]+)$/.exec(path))) return { name: "chore", id: m[1]! };
   if (path.startsWith("/chores")) return { name: "chores" };
@@ -50,6 +47,13 @@ export function routeOf(path: string): Route {
   if (path.startsWith("/family")) return { name: "family" };
   if (path.startsWith("/settings")) return { name: "settings" };
   return { name: "today" };
+}
+
+/** 前の URL（/chores/bulk など）で開いたら、URL をその画面のものに書き換える（履歴は増やさない） */
+export function fixPath(r: Route): Route {
+  const want = pathOf(r);
+  if (r.name === "chore-table" && location.pathname !== want) history.replaceState(null, "", want + location.search);
+  return r;
 }
 
 /** タブ（今日・家事・統計・家族・設定）のどれに当たるか */
@@ -61,7 +65,7 @@ export function tabOf(r: Route): "today" | "chores" | "stats" | "family" | "sett
   return "chores";
 }
 
-/** 保存していない変更があるときに出す確かめ（表で直す）。null なら確かめない */
+/** 保存していない変更があるときに出す確かめ（表で編集）。null なら確かめない */
 let leaveMessage: string | null = null;
 export function setLeaveGuard(message: string | null) {
   leaveMessage = message;

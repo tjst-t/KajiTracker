@@ -1,6 +1,6 @@
-// まとめて登録の表（PC 幅）を本物のブラウザで通す：貼り付け・範囲に同じ値・角を引っぱって埋める・読めない周期の赤・
-// 日付のカレンダー・周期の選ぶ画面・登録。スマホ幅では1行ずつの画面のまま。
-// 表で直す：担当の列を範囲選択でまとめて同じ人にして保存する・保存しないで離れようとすると確かめる・「削除」にチェックして確かめのうえ消す。
+// 家事を表で編集（PC 幅）を本物のブラウザで通す：列の並び・貼り付け・範囲に同じ値・角を引っぱって埋める・読めない周期の赤・
+// 日付のカレンダー・周期の選ぶ画面・新しい行の追加。登録済みの行の変更と新しい行の追加と削除を1回の保存で。
+// 最後の行に入ると行が増える・「行をまとめて追加」・/chores/bulk は /chores/table へ。スマホ幅では1行ずつ足す画面。
 // 開発サーバを起こしてから `npm run e2e`（別のポートなら E2E_ORIGIN=http://localhost:5191 node e2e/bulk-grid-flow.mjs）。
 import { execSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
@@ -58,23 +58,44 @@ try {
   await page.getByRole("button", { name: "Family を作る" }).click();
   await page.getByRole("heading", { name: "まだ家事がありません" }).waitFor();
 
+  // ---- (1) 一覧の「表で編集」で開く。列はグループから ----
+  step = "open";
   await page.getByRole("button", { name: "家事", exact: true }).click();
-  await page.getByRole("button", { name: "まとめて登録" }).click();
-  await h1(page, "まとめて登録");
+  await h1(page, "家事");
+  if (await page.getByRole("button", { name: "まとめて登録" }).count()) throw new Error("一覧に「まとめて登録」が残っている");
+  if (await page.getByRole("button", { name: "表で直す" }).count()) throw new Error("一覧に「表で直す」が残っている");
+  await page.getByRole("button", { name: "表で編集" }).click();
+  await h1(page, "家事を表で編集");
+  if (new URL(page.url()).pathname !== "/chores/table") throw new Error(`URL が ${page.url()}`);
   const grid = page.locator(".bulk-grid .dsg-container");
   await grid.waitFor();
+  const heads = (await grid.locator(".dsg-cell-header").allInnerTexts()).map((t) => t.trim()).filter(Boolean);
+  const wantHeads = ["グループ", "家事の名前", "周期", "期限", "担当", "通知の時刻", "無効", "削除"];
+  if (heads.join(",") !== wantHeads.join(",")) throw new Error(`列の並びが「${heads.join("・")}」`);
   const cell = (row, field) => page.locator(`[data-cell="${row}-${field}"]`);
   const text = async (row, field) => (await cell(row, field).locator(".bulk-grid__text").innerText()).trim();
+  /** 表が描き直すまで少し待ちながら読む */
   const expectText = async (row, field, want) => {
-    const got = await text(row, field);
-    if (!(want instanceof RegExp ? want.test(got) : got === want)) throw new Error(`${row}行目の${field}が「${got}」（ほしいのは ${want}）`);
+    let got = "";
+    for (let i = 0; i < 20; i++) {
+      got = await text(row, field).catch(() => "");
+      if (want instanceof RegExp ? want.test(got) : got === want) return;
+      await page.waitForTimeout(100);
+    }
+    throw new Error(`${row}行目の${field}が「${got}」（ほしいのは ${want}）`);
   };
+  const rowCount = () => grid.locator("[data-gutter]").evaluateAll((es) => Math.max(0, ...es.map((e) => Number(e.dataset.gutter))));
   const popover = page.locator(".grid-popover");
+  await page.getByRole("button", { name: "変更はありません" }).waitFor();
+  ok("一覧の「表で編集」で開くと、見出しは「家事を表で編集」、列はグループ・家事の名前・周期・期限・担当・通知の時刻・無効・削除の順");
 
-  // ---- (1) Excel 形式（タブ区切り）の3行を貼り付ける ----
+  // ---- (5) Excel 形式（タブ区切り）の3行を新しい行に貼り付ける（最後の行をこえたら行が増える） ----
   step = "paste";
-  await cell(1, "name").click();
-  const tsv = "窓ふき\tキッチン\t10日ごと\n玄関の掃除\tげんかん\t3日\n洗面台\t風呂\t毎月 1日\n";
+  await cell(1, "group").click();
+  await popover.waitFor();
+  await page.keyboard.press("Escape");
+  await popover.waitFor({ state: "detached" });
+  const tsv = "キッチン\t窓ふき\t10日ごと\nげんかん\t玄関の掃除\t3日\n風呂\t洗面台\t毎月 1日\n";
   await page.evaluate((t) => {
     const dt = new DataTransfer();
     dt.setData("text/plain", t);
@@ -83,23 +104,27 @@ try {
   await expectText(1, "name", "窓ふき");
   await expectText(2, "group", "げんかん");
   await expectText(3, "schedule", "毎月 1日");
+  if ((await rowCount()) < 4) throw new Error(`貼り付けたのに行が足りない（${await rowCount()}行）`);
+  if (!(await grid.locator('[data-gutter="1"]').evaluate((e) => e.classList.contains("bulk-grid__new")))) throw new Error("新しい行に「新」の印が無い");
   if (!(await cell(2, "group").evaluate((e) => e.classList.contains("is-invalid")))) throw new Error("無いグループが赤くない");
-  await page.getByText("2行目・グループ：「げんかん」というグループはありません").waitFor();
-  await page.getByRole("button", { name: "3件を登録" }).waitFor();
+  await page.getByText("2行目（玄関の掃除）・グループ：「げんかん」というグループはありません").waitFor();
+  await page.getByRole("button", { name: "3件の追加を保存" }).waitFor();
   await page.screenshot({ path: `${SHOTS}/30-grid-pasted.png` });
-  ok("タブ区切りの3行を貼り付けると3行に入り、無いグループは赤くなる");
+  ok("タブ区切りの3行を貼り付けると3行に入り（行が足りなければ増える）、無いグループは赤くなる");
 
-  // ---- (2) グループの列の3マスを選んで、候補の一覧から同じ値を選ぶ ----
+  // ---- グループの列の3マスを選んで、候補の一覧から同じ値を選ぶ ----
   step = "range-pick";
-  // マウスで1〜3行目のグループを引っぱって選び（押して離すだけではないので一覧は開かない）、Enter で一覧を開く
   const center = async (loc) => {
     const b = await loc.boundingBox();
     return [b.x + b.width / 2, b.y + b.height / 2];
   };
-  await page.mouse.move(...(await center(cell(1, "group"))));
-  await page.mouse.down();
-  await page.mouse.move(...(await center(cell(3, "group"))), { steps: 6 });
-  await page.mouse.up();
+  const dragSelect = async (from, to) => {
+    await page.mouse.move(...(await center(from)));
+    await page.mouse.down();
+    await page.mouse.move(...(await center(to)), { steps: 6 });
+    await page.mouse.up();
+  };
+  await dragSelect(cell(1, "group"), cell(3, "group"));
   if (await popover.count()) throw new Error("範囲を選んだだけで一覧が開いた");
   await page.keyboard.press("Enter");
   await page.getByRole("dialog", { name: "1行目のグループを選ぶ" }).waitFor();
@@ -109,7 +134,7 @@ try {
   if (await page.locator(".bulk-grid__cell.is-invalid").count()) throw new Error("グループを選んだのに赤いマスが残る");
   ok("グループの3マスを選んで一覧から「掃除」を選ぶと、3マスとも「掃除」になる");
 
-  // ---- (3) 1行目の周期を角を引っぱって下の2行に埋める ----
+  // ---- 1行目の周期を角を引っぱって下の2行に埋める ----
   step = "fill-handle";
   await cell(1, "schedule").click();
   await popover.waitFor();
@@ -124,14 +149,13 @@ try {
   await page.mouse.up();
   await expectText(2, "schedule", "10日ごと");
   await expectText(3, "schedule", "10日ごと");
-  // 元に戻す・やり直す
   await page.keyboard.press("ControlOrMeta+z");
   await expectText(3, "schedule", "毎月 1日");
   await page.keyboard.press("ControlOrMeta+y");
   await expectText(3, "schedule", "10日ごと");
   ok("角を引っぱると、1行目の周期が下の2行に入る（Ctrl+Z で戻し、Ctrl+Y でやり直せる）");
 
-  // ---- (4) 読めない周期が赤くなり、直すと消える ----
+  // ---- 読めない周期が赤くなり、直すと消える ----
   step = "invalid-schedule";
   await cell(2, "schedule").click();
   await popover.waitFor();
@@ -141,7 +165,7 @@ try {
   if (!(await cell(2, "schedule").evaluate((e) => e.classList.contains("is-invalid")))) throw new Error("読めない周期が赤くない");
   const why = await cell(2, "schedule").getAttribute("title");
   if (!why?.includes("周期として読めません")) throw new Error(`理由が出ない: ${why}`);
-  await page.getByText("2行目・周期：「ほぼ毎日」は周期として読めません").waitFor();
+  await page.getByText("2行目（玄関の掃除）・周期：「ほぼ毎日」は周期として読めません").waitFor();
   await page.screenshot({ path: `${SHOTS}/32-grid-invalid.png` });
   await cell(2, "schedule").click();
   await page.keyboard.type("毎日");
@@ -151,19 +175,19 @@ try {
   if (await cell(2, "schedule").evaluate((e) => e.classList.contains("is-invalid"))) throw new Error("直したのに赤い");
   ok("読めない周期は赤くなって理由が出て、「毎日」に直すと消える");
 
-  // ---- (5) 最初の期限のマスを押してカレンダーから日付を選ぶ ----
+  // ---- 期限のマスを押してカレンダーから日付を選ぶ ----
   step = "date-pick";
   const target = jst(5);
   await cell(1, "due").click();
-  await page.getByRole("dialog", { name: "1行目の最初の期限を選ぶ" }).waitFor();
+  await page.getByRole("dialog", { name: "1行目の期限を選ぶ" }).waitFor();
   if (target.slice(0, 7) !== jst().slice(0, 7)) await popover.getByRole("button", { name: "次の月" }).click();
   await page.screenshot({ path: `${SHOTS}/33-grid-date.png` });
   await popover.getByRole("button", { name: new RegExp(`^${Number(target.slice(5, 7))}月${Number(target.slice(8, 10))}日（`) }).click();
   await popover.waitFor({ state: "detached" });
   await expectText(1, "due", new RegExp(`^${md(target)}（`));
-  ok(`最初の期限のマスを押し、カレンダーから ${md(target)} を選ぶ`);
+  ok(`期限のマスを押し、カレンダーから ${md(target)} を選ぶ`);
 
-  // ---- (6) 周期のマスを押して小さな画面から「毎週 月・木」を選ぶ ----
+  // ---- 周期のマスを押して小さな画面から「毎週 月・木」を選ぶ ----
   step = "schedule-pick";
   await cell(3, "schedule").click();
   const dlg = page.getByRole("dialog", { name: "3行目の周期を選ぶ" });
@@ -179,164 +203,180 @@ try {
   await popover.waitFor({ state: "detached" });
   await expectText(3, "schedule", "毎週 月・木曜");
   await expectText(3, "due", /^次は /);
+  // 新しい行では、無効・削除は使えない
+  await expectText(3, "archived", "—");
+  await expectText(3, "delete", "—");
   await page.mouse.click(10, 10);
   await page.screenshot({ path: `${SHOTS}/35-grid-ready.png` });
-  ok("周期の小さな画面で「毎週 月・木」を選ぶと、マスに「毎週 月・木曜」、最初の期限は次の予定日が薄く出る");
+  ok("周期の小さな画面で「毎週 月・木」を選ぶと、マスに「毎週 月・木曜」、期限は次の予定日が薄く出る。新しい行の無効・削除は「—」");
 
-  // ---- (7) 登録して一覧に出る ----
   step = "submit";
-  await page.getByRole("button", { name: "3件を登録" }).click();
-  await page.getByText("3件の家事を登録しました").waitFor();
+  await page.getByRole("button", { name: "3件の追加を保存" }).click();
+  await h1(page, "家事");
+  await page.getByText("3件を追加しました").waitFor();
   for (const name of ["窓ふき", "玄関の掃除", "洗面台"]) await page.getByRole("link", { name }).waitFor();
   await page.getByRole("heading", { level: 2, name: /^掃除/ }).waitFor();
   await page.getByRole("cell", { name: "毎週 月・木曜" }).waitFor();
   await page.getByRole("cell", { name: "10日ごと" }).waitFor();
   await page.screenshot({ path: `${SHOTS}/36-grid-registered.png`, fullPage: true });
-  ok("3件を登録すると、一覧の「掃除」に3件出る");
+  ok("保存すると一覧に戻って「3件を追加しました」、一覧の「掃除」に3件出る");
 
-  // ---- おまけ：範囲を選んで打ち Ctrl/⌘+Enter で範囲に同じ値、よくある家事は表の末尾に足す ----
-  step = "ctrl-enter";
-  await page.getByRole("button", { name: "家事", exact: true }).click();
-  await page.getByRole("button", { name: "まとめて登録" }).click();
+  // ---- (2) 登録済みの担当を変え、新しい行に2件書き、1件を削除にして、1回で保存 ----
+  step = "unified-save";
+  await page.getByRole("button", { name: "表で編集" }).click();
+  await h1(page, "家事を表で編集");
   await grid.waitFor();
-  await page.mouse.move(...(await center(cell(1, "name"))));
-  await page.mouse.down();
-  await page.mouse.move(...(await center(cell(3, "name"))), { steps: 6 });
-  await page.mouse.up();
-  await page.keyboard.type("x");
-  await page.keyboard.type("yz");
-  await page.keyboard.press("ControlOrMeta+Enter");
-  for (const r of [1, 2, 3]) await expectText(r, "name", "xyz");
-  await page.getByRole("button", { name: "よくある家事から選ぶ" }).click();
-  await page.getByRole("button", { name: /件を表に足す$/ }).click();
-  await expectText(1, "name", "xyz");
-  await expectText(4, "name", "シンクの排水口");
-  await expectText(4, "schedule", "7日ごと");
-  await page.screenshot({ path: `${SHOTS}/38-grid-templates.png` });
-  ok("範囲を選んで打ち Ctrl+Enter で3行に同じ名前、よくある家事は表の末尾に足される");
+  // 並びはグループの並び順・名前の順。最後に空の新しい行
+  const names = [];
+  for (const r of [1, 2, 3]) names.push(await text(r, "name"));
+  if (names.join(",") !== ["洗面台", "窓ふき", "玄関の掃除"].sort((a, b) => a.localeCompare(b, "ja")).join(",")) throw new Error(`並びが「${names.join("・")}」`);
+  if ((await rowCount()) !== 4) throw new Error(`行の数が ${await rowCount()}（登録済み3＋空1のはず）`);
+  const [first, , gone] = names;
 
-  // ---- (9) 表で直す：3つの家事の担当を範囲選択で同じ人にして保存する ----
-  step = "table-edit";
-  await page.getByRole("button", { name: "家事", exact: true }).click();
-  await page.getByRole("button", { name: "表で直す" }).click();
-  await h1(page, "表で直す");
-  await grid.waitFor();
-  for (const r of [1, 2, 3]) await expectText(r, "assignee", "なし");
-  await page.mouse.move(...(await center(cell(1, "assignee"))));
-  await page.mouse.down();
-  await page.mouse.move(...(await center(cell(3, "assignee"))), { steps: 6 });
-  await page.mouse.up();
-  await page.keyboard.press("Enter");
+  await cell(1, "assignee").click();
   await page.getByRole("dialog", { name: "1行目の担当を選ぶ" }).waitFor();
   await popover.getByRole("option", { name: "たくみ" }).click();
-  for (const r of [1, 2, 3]) {
-    await expectText(r, "assignee", "たくみ");
-    if (!(await cell(r, "assignee").evaluate((e) => e.classList.contains("is-changed")))) throw new Error(`${r}行目の担当に変えた印が無い`);
-  }
+  if (!(await cell(1, "assignee").evaluate((e) => e.classList.contains("is-changed")))) throw new Error("1行目の担当に変えた印が無い");
   if (await cell(1, "name").evaluate((e) => e.classList.contains("is-changed"))) throw new Error("変えていないマスに印が付いた");
-  await page.getByRole("button", { name: "3件の変更を保存" }).waitFor();
+
+  for (const [row, name, sched] of [
+    [4, "排水口", "14日ごと"],
+    [5, "換気扇", "毎週 土"],
+  ]) {
+    await cell(row, "name").click();
+    await page.keyboard.press("Enter");
+    await page.keyboard.type(name);
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Enter");
+    await popover.waitFor();
+    await page.keyboard.type(sched);
+    await page.keyboard.press("Enter");
+    await popover.waitFor({ state: "detached" });
+    await expectText(row, "name", name);
+  }
+  await cell(3, "delete").click();
+  if (!(await cell(3, "delete").locator("input").isChecked())) throw new Error("3行目の削除にチェックが入らない");
+  if (!(await cell(3, "name").evaluate((e) => !!e.closest(".dsg-row.is-deleted")))) throw new Error("3行目が削除の見た目にならない");
+  const saveBtn = page.getByRole("button", { name: "2件の追加・1件の変更・1件の削除を保存" });
+  await saveBtn.waitFor();
   await page.mouse.click(10, 10);
-  await page.screenshot({ path: `${SHOTS}/39-table-edit.png` });
+  await page.screenshot({ path: `${SHOTS}/39-table-unified.png` });
 
   // 保存しないで離れようとすると確かめる。やめると残る
   dismissNext = true;
   await page.getByRole("button", { name: "家事", exact: true }).click();
   if (!lastDialog.includes("保存していない変更")) throw new Error(`確かめが出ない: ${lastDialog}`);
-  await h1(page, "表で直す");
-  await expectText(2, "assignee", "たくみ");
+  await h1(page, "家事を表で編集");
+  await expectText(4, "name", "排水口");
 
   // 無効のマスは押すと入り切りし、Ctrl+Z で戻る
-  await cell(3, "archived").click();
-  if (!(await cell(3, "archived").locator("input").isChecked())) throw new Error("無効のマスを押してもチェックが入らない");
-  await page.getByRole("button", { name: "3件の変更を保存" }).waitFor();
+  await cell(2, "archived").click();
+  if (!(await cell(2, "archived").locator("input").isChecked())) throw new Error("無効のマスを押してもチェックが入らない");
+  await page.getByRole("button", { name: "2件の追加・2件の変更・1件の削除を保存" }).waitFor();
   await page.keyboard.press("ControlOrMeta+z");
-  if (await cell(3, "archived").locator("input").isChecked()) throw new Error("Ctrl+Z で無効が戻らない");
-  // 選んであるマスをもう一度押しても1回だけ変わる
-  await cell(3, "archived").click();
-  if (!(await cell(3, "archived").locator("input").isChecked())) throw new Error("選んである無効のマスを押すと2回変わる");
-  await page.keyboard.press("ControlOrMeta+z");
-  if (await cell(3, "archived").locator("input").isChecked()) throw new Error("Ctrl+Z で無効が戻らない（2回目）");
+  if (await cell(2, "archived").locator("input").isChecked()) throw new Error("Ctrl+Z で無効が戻らない");
 
-  await page.getByRole("button", { name: "3件の変更を保存" }).click();
-  await page.getByText("3件の家事を保存しました").waitFor();
-  await page.getByRole("button", { name: "変更はありません" }).waitFor();
-  for (const r of [1, 2, 3]) await expectText(r, "assignee", "たくみ");
-  if (await page.locator(".bulk-grid__cell.is-changed").count()) throw new Error("保存したのに変えた印が残る");
-  lastDialog = "";
-  await page.getByRole("button", { name: "家事", exact: true }).click();
-  await h1(page, "家事");
-  if (lastDialog) throw new Error(`保存したあとなのに確かめが出た: ${lastDialog}`);
-  await page.getByRole("link", { name: "窓ふき" }).waitFor();
-  const who = await page.locator('td[data-label="担当"]').allInnerTexts();
-  if (who.length !== 3 || who.some((t) => t.trim() !== "たくみ")) throw new Error(`一覧の担当が「${who.join("、")}」`);
-  await page.screenshot({ path: `${SHOTS}/40-table-saved.png`, fullPage: true });
-  ok("表で直す：担当の3マスを範囲で選んで「たくみ」にし、保存すると一覧の3件とも担当がたくみになる（保存前に離れると確かめる）");
-
-  // ---- (10) 表で直す：2行の「削除」にチェックして保存し、確かめで OK すると一覧から消える ----
-  step = "table-delete";
-  await page.getByText("無効の家事も見る").waitFor();
-  await page.getByRole("button", { name: "表で直す" }).click();
-  await h1(page, "表で直す");
-  await grid.waitFor();
-  await grid.getByText("無効", { exact: true }).waitFor();
-  await grid.getByText("削除", { exact: true }).waitFor();
-  const gone = [await cell(1, "name").innerText(), await cell(2, "name").innerText()].map((t) => t.trim());
-  const left = (await cell(3, "name").innerText()).trim();
-  await cell(1, "delete").click();
-  await cell(2, "delete").click();
-  for (const r of [1, 2]) {
-    if (!(await cell(r, "delete").locator("input").isChecked())) throw new Error(`${r}行目の削除にチェックが入らない`);
-    if (!(await cell(r, "name").evaluate((e) => !!e.closest(".dsg-row.is-deleted")))) throw new Error(`${r}行目が削除の見た目にならない`);
-  }
-  // ほかの行の変更と削除は、保存ボタンで分けて数える
-  await cell(3, "archived").click();
-  await page.getByRole("button", { name: "1件の変更・2件の削除を保存" }).waitFor();
-  await page.keyboard.press("ControlOrMeta+z");
-  if (await cell(3, "archived").locator("input").isChecked()) throw new Error("Ctrl+Z で無効が戻らない");
-  await page.getByRole("button", { name: "2件の削除を保存" }).waitFor();
-  await page.mouse.click(10, 10);
-  await page.screenshot({ path: `${SHOTS}/41-table-delete.png` });
-
-  // 確かめでやめると、何も消えない
+  // 確かめでやめると何も保存しない。OK すると全部まとめて保存して一覧へ
   dismissNext = true;
-  await page.getByRole("button", { name: "2件の削除を保存" }).click();
-  for (const n of gone) if (!lastDialog.includes(n)) throw new Error(`確かめに「${n}」が無い: ${lastDialog}`);
-  if (!lastDialog.includes("元に戻せません") || !lastDialog.includes("『無効』")) throw new Error(`確かめの文が違う: ${lastDialog}`);
-  await page.getByRole("button", { name: "2件の削除を保存" }).waitFor();
-  if (!(await cell(1, "delete").locator("input").isChecked())) throw new Error("確かめでやめたのにチェックが消えた");
-
-  // OK すると消える
-  await page.getByRole("button", { name: "2件の削除を保存" }).click();
-  await page.getByText("2件の家事を削除しました").waitFor();
-  await page.getByRole("button", { name: "変更はありません" }).waitFor();
-  await expectText(1, "name", left);
-  if (await cell(2, "name").count()) throw new Error("消したのに表に行が残る");
-  await page.getByRole("button", { name: "家事", exact: true }).click();
+  await saveBtn.click();
+  if (!lastDialog.includes(gone) || !lastDialog.includes("元に戻せません") || !lastDialog.includes("『無効』")) throw new Error(`確かめの文が違う: ${lastDialog}`);
+  await saveBtn.waitFor();
+  await saveBtn.click();
   await h1(page, "家事");
-  await page.getByRole("link", { name: left }).waitFor();
-  for (const n of gone) if (await page.getByRole("link", { name: n }).count()) throw new Error(`消したのに一覧に「${n}」が残る`);
-  await page.screenshot({ path: `${SHOTS}/42-table-deleted.png`, fullPage: true });
-  ok("表で直す：2行の「削除」にチェックして保存すると、名前を並べた確かめが出て、OK で一覧から消える（やめると残る）");
+  await page.getByText("2件を追加・1件を変更・1件を削除しました").waitFor();
+  for (const n of [first, "排水口", "換気扇"]) await page.getByRole("link", { name: n }).waitFor();
+  if (await page.getByRole("link", { name: gone }).count()) throw new Error(`消したのに一覧に「${gone}」が残る`);
+  const who = await page.locator('td[data-label="担当"]').allInnerTexts();
+  if (who.filter((t) => t.trim() === "たくみ").length !== 1) throw new Error(`一覧の担当が「${who.join("、")}」`);
+  await page.screenshot({ path: `${SHOTS}/40-table-saved.png`, fullPage: true });
+  ok("登録済みの担当を変え、新しい行に2件書き、1件を削除にして「2件の追加・1件の変更・1件の削除を保存」→ 確かめ → 一覧に反映");
 
-  // ---- (8) スマホ幅では1行ずつの画面 ----
+  // ---- (3) 最後の行に矢印キーで移ると行が1つ増える ----
+  step = "auto-row";
+  await page.getByRole("button", { name: "表で編集" }).click();
+  await h1(page, "家事を表で編集");
+  await grid.waitFor();
+  const before = await rowCount();
+  if (before !== 5) throw new Error(`行の数が ${before}（登録済み4＋空1のはず）`);
+  await cell(before - 1, "name").click();
+  await page.keyboard.press("ArrowDown");
+  await page.waitForFunction((n) => Math.max(...[...document.querySelectorAll("[data-gutter]")].map((e) => Number(e.dataset.gutter))) === n, before + 1);
+  ok(`最後の行に矢印キーで移ると、行が1つ増える（${before} → ${before + 1}）`);
+
+  // ---- (4) 行をまとめて追加：10 を入れると10行増え、最初に足した行の名前のマスへ ----
+  step = "add-rows";
+  const n0 = await rowCount();
+  await page.getByRole("button", { name: "行をまとめて追加" }).click();
+  const addDlg = page.getByRole("dialog", { name: "行をまとめて追加" });
+  await addDlg.waitFor();
+  if ((await addDlg.getByRole("spinbutton").inputValue()) !== "5") throw new Error("足す行の数の初期値が 5 ではない");
+  await page.keyboard.press("Escape");
+  await addDlg.waitFor({ state: "detached" });
+  if ((await rowCount()) !== n0) throw new Error("Esc でやめたのに行が増えた");
+  await page.getByRole("button", { name: "行をまとめて追加" }).click();
+  await addDlg.getByRole("spinbutton").fill("10");
+  await page.screenshot({ path: `${SHOTS}/41-add-rows.png` });
+  await page.keyboard.press("Enter");
+  await addDlg.waitFor({ state: "detached" });
+  await page.waitForFunction((n) => Math.max(...[...document.querySelectorAll("[data-gutter]")].map((e) => Number(e.dataset.gutter))) === n, n0 + 10);
+  await page.keyboard.type("xyz");
+  await page.keyboard.press("Enter");
+  await expectText(n0 + 1, "name", "xyz");
+  await page.screenshot({ path: `${SHOTS}/42-rows-added.png` });
+  ok(`「行をまとめて追加」で 10 を入れると10行増え（${n0} → ${n0 + 10}）、最初に足した行の名前のマスに打てる`);
+
+  // 新しい行は右クリックの「この行を消す」で消せる。登録済みの行には出さない
+  step = "context-menu";
+  await cell(1, "name").click({ button: "right" });
+  const menu = page.locator(".dsg-context-menu");
+  await menu.waitFor();
+  if (await menu.getByText("この行を消す").count()) throw new Error("登録済みの行に「この行を消す」が出る");
+  await page.keyboard.press("Escape");
+  await page.mouse.click(10, 10);
+  await menu.waitFor({ state: "detached" });
+  await cell(n0 + 1, "name").click({ button: "right" });
+  await menu.getByText("この行を消す").click();
+  if ((await text(n0 + 1, "name")) === "xyz") throw new Error("「この行を消す」で行が消えない");
+  ok("新しい行は右クリックの「この行を消す」で消せる（登録済みの行には出ない）");
+
+  // よくある家事は新しい行として末尾に足す。範囲を選んで打ち Ctrl/⌘+Enter で範囲に同じ値
+  step = "templates";
+  await page.getByRole("button", { name: "よくある家事から選ぶ" }).click();
+  await page.getByRole("button", { name: /件を表に足す$/ }).click();
+  await expectText(5, "name", "シンクの排水口");
+  await expectText(5, "schedule", "7日ごと");
+  await dragSelect(cell(5, "notify"), cell(7, "notify"));
+  await page.keyboard.type("7:00");
+  await page.keyboard.press("ControlOrMeta+Enter");
+  for (const r of [5, 6, 7]) await expectText(r, "notify", "7:00");
+  await page.mouse.click(10, 10);
+  await page.screenshot({ path: `${SHOTS}/38-grid-templates.png` });
+  ok("よくある家事は新しい行として末尾に足され、範囲を選んで打ち Ctrl+Enter で3行に同じ値が入る");
+
+  // ---- (6) /chores/bulk を開くと /chores/table に移る ----
+  step = "redirect";
+  await page.goto(`${ORIGIN}/chores/bulk`);
+  await h1(page, "家事を表で編集");
+  if (new URL(page.url()).pathname !== "/chores/table") throw new Error(`URL が ${page.url()}`);
+  ok("/chores/bulk を開くと /chores/table に移る");
+
+  // ---- (7) スマホ幅では1行ずつ足す画面 ----
   step = "phone";
   const phone = await ctx.newPage();
   await phone.setViewportSize({ width: 390, height: 844 });
-  await phone.goto(`${ORIGIN}/chores/bulk`);
+  await phone.goto(`${ORIGIN}/chores/table`);
   await h1(phone, "まとめて登録");
   await phone.getByLabel("1行目の家事の名前").waitFor();
   if (await phone.locator(".bulk-grid").count()) throw new Error("スマホ幅なのに表が出る");
   await phone.screenshot({ path: `${SHOTS}/37-bulk-phone.png`, fullPage: true });
-  // 幅を広げると表に切り替わる
-  await phone.setViewportSize({ width: 1024, height: 844 });
-  await phone.locator(".bulk-grid .dsg-container").waitFor();
-  ok("スマホ幅では1行ずつの画面、広げると表になる");
-  await phone.setViewportSize({ width: 390, height: 844 });
+  await phone.goto(`${ORIGIN}/chores`);
+  await h1(phone, "家事");
+  if (await phone.getByRole("button", { name: "表で編集" }).count()) throw new Error("スマホ幅なのに「表で編集」が出る");
   await phone.goto(`${ORIGIN}/chores/table`);
-  await h1(phone, "表で直す");
-  await phone.getByText("表で直すのは PC で").waitFor();
-  if (await phone.locator(".bulk-grid").count()) throw new Error("スマホ幅なのに直す表が出る");
-  ok("スマホ幅の「表で直す」は PC で開くよう案内だけ出す");
+  await phone.setViewportSize({ width: 1024, height: 844 });
+  await h1(phone, "家事を表で編集");
+  await phone.locator(".bulk-grid .dsg-container").waitFor();
+  ok("スマホ幅では1行ずつ足す画面（一覧に「表で編集」は出ない）、広げると表になる");
 } catch (e) {
   console.log(`止まった場所: ${step}`);
   errors.push(String(e).split("\n").slice(0, 8).join("\n"));

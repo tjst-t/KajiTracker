@@ -1,4 +1,4 @@
-// カレンダー固定の規則の入力欄。家事の登録画面と、まとめて登録の小さな画面で使う
+// カレンダー固定の規則の入力欄。家事の登録画面と、まとめて登録・表で編集の小さな画面で使う
 import { addDays, toDayNum, weekdayOf } from "../../shared/date";
 import { WEEKDAYS } from "../../shared/describe";
 import { type CalendarRule, nextOccurrenceAfter } from "../../shared/schedule";

@@ -1,36 +1,66 @@
-// 登録済みの家事を表でまとめて直す（PC 幅）。表の部品は components/Sheet。
-// 行は全部の家事（無効のものも）。変えたマスに印を付け、変えた行の変えた項目だけを PATCH /families/:fid/chores/bulk で送る。
-// 「削除」にチェックした行は、確かめてから deleteIds で一緒に送る（ほかのマスの変更は送らない）。
+// 家事を表で編集（PC 幅）。表の部品は components/Sheet。上に登録済みの家事（無効のものも）、その下に新しい行。
+// 登録済みの行は変えたマスに印を付けて変えた項目だけを、新しい行は名前のあるものを、「削除」にチェックした行は確かめてから、
+// PATCH /families/:fid/chores/bulk の1回（create・chores・deleteIds）でまとめて保存する。スマホ幅では1行ずつ足す画面。
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DataSheetGrid } from "react-datasheet-grid";
-import { type DateStr, todayInTokyo, toDayNum } from "../../shared/date";
-import { shortDate } from "../../shared/describe";
+import { type CellProps, DataSheetGrid } from "react-datasheet-grid";
+import { type DateStr, addDays, todayInTokyo, toDayNum } from "../../shared/date";
+import { describeRule, shortDate } from "../../shared/describe";
 import { type CalendarRule, type Schedule, evaluate, isOccurrence } from "../../shared/schedule";
 import { formatScheduleText, parseDateText, parseScheduleText } from "../../shared/schedule-text";
+import type { ChoreTemplate } from "../../shared/templates";
 import { ApiError, type Family, type Group, type Member, api } from "../api";
 import type { ChoreView } from "../chores";
-import { CHECKED, ROW_HEIGHT, type SheetCol, SheetCtx, type SheetCtxValue, norm, useSheet } from "../components/Sheet";
+import { CHECKED, ContextMenu, ROW_HEIGHT, type SheetCol, SheetCtx, type SheetCtxValue, norm, useSheet } from "../components/Sheet";
+import { TemplateDialog, useModal } from "../components/TemplateDialog";
 import { errorText } from "../format";
 import { type Nav, setLeaveGuard } from "../router";
-import { useWide } from "./ChoreBulk";
+import { ChoreBulk, useWide } from "./ChoreBulk";
 import { TIMES } from "./ChoreForm";
 
-type EditRow = { id: string; name: string; group: string; schedule: string; due: string; assignee: string; notify: string; archived: string; delete: string };
+type EditRow = { id: string; group: string; name: string; schedule: string; due: string; assignee: string; notify: string; archived: string; delete: string };
 type Field = Exclude<keyof EditRow, "id">;
 
 /** 列の並び（col の番号はこの順） */
 const COLS: (SheetCol & { field: Field })[] = [
-  { field: "name", title: "家事の名前", basis: 220, grow: 2, minWidth: 160 },
   { field: "group", title: "グループ", picker: "list", basis: 130 },
+  { field: "name", title: "家事の名前", placeholder: "例：シンクの排水口", basis: 220, grow: 2, minWidth: 160 },
   { field: "schedule", title: "周期", picker: "schedule", placeholder: "例：7日ごと、毎週 月・木", basis: 170 },
-  { field: "due", title: "次の期限", picker: "date", basis: 150 },
+  { field: "due", title: "期限", picker: "date", basis: 150 },
   { field: "assignee", title: "担当", picker: "list", basis: 130 },
   { field: "notify", title: "通知の時刻", picker: "list", basis: 120, minWidth: 100 },
   { field: "archived", title: "無効", picker: "check", basis: 80, grow: 0, minWidth: 80 },
   { field: "delete", title: "削除", picker: "check", basis: 80, grow: 0, minWidth: 80 },
 ];
+const NAME_COL = COLS.findIndex((c) => c.field === "name");
+/** 「行をまとめて追加」で一度に足せる行の数 */
+const ADD_MAX = 100;
 
 type Data = { today: DateStr; chores: ChoreView[]; groups: Group[]; members: Member[] };
+
+let seq = 0;
+const NEW = "new-";
+const isNew = (r: EditRow) => r.id.startsWith(NEW);
+const blankRow = (patch: Partial<EditRow> = {}): EditRow => ({
+  id: `${NEW}${++seq}`,
+  group: "",
+  name: "",
+  schedule: "",
+  due: "",
+  assignee: "",
+  notify: "",
+  archived: "",
+  delete: "",
+  ...patch,
+});
+/** 名前が空の新しい行（保存しない） */
+const isBlankNew = (r: EditRow) => isNew(r) && !r.name.trim();
+
+/** 登録済みの行を上、新しい行を下に並べ、最後にいつも空の行を1つ置く */
+function normalize(rows: EditRow[]): EditRow[] {
+  const out = [...rows.filter((r) => !isNew(r)), ...rows.filter(isNew)];
+  const last = out[out.length - 1];
+  return last && isBlankNew(last) ? out : [...out, blankRow()];
+}
 
 const everyOf = (s: Schedule) => (s.type === "calendar" ? s.rule.every : 1);
 
@@ -40,8 +70,8 @@ function rowOf(c: ChoreView): EditRow {
   const due = s.type === "interval" ? (c.dueOn ?? s.firstDueOn) : everyOf(s) >= 2 ? (c.dueOn ?? s.rule.anchor) : "";
   return {
     id: c.id,
-    name: c.name,
     group: c.groupName ?? "",
+    name: c.name,
     schedule: formatScheduleText(s),
     due,
     assignee: c.assigneeName ?? "",
@@ -61,57 +91,100 @@ function parseNotify(text: string): string | null | undefined {
   return TIMES.includes(v) ? v : undefined;
 }
 
+/** 名前の文字を id にする。空・「なし」は null、見つからなければ undefined */
+function lookup<T>(text: string, list: T[], nameOf: (t: T) => string, idOf: (t: T) => string) {
+  const t = norm(text);
+  if (t === "" || t === "なし") return null;
+  const hit = list.find((x) => norm(nameOf(x)) === t);
+  return hit ? idOf(hit) : undefined;
+}
+
 /** 1行を読んだ結果 */
 type Checked = {
   errors: Partial<Record<Field, string>>;
-  /** 元から変わったマス */
+  /** 元から変わったマス（登録済みの行だけ） */
   changed: Set<Field>;
-  /** 次の期限のマスに薄く出す日付 */
+  /** 期限のマスに薄く出す日付 */
   dueHint?: string;
-  /** 毎週・毎月は次の期限を選べない（周期から決まる） */
+  /** 毎週・毎月は期限を選べない（周期から決まる） */
   dueDisabled: boolean;
-  /** 送る中身（変えた項目だけ）。不備があれば無い */
+  /** 送る中身（登録済みの行は変えた項目だけ）。不備があれば・送るものが無ければ無い */
   payload?: Record<string, unknown>;
 };
 
-function checkRow(r: EditRow, orig: EditRow, chore: ChoreView, today: DateStr, groups: Group[], members: Member[]): Checked {
-  const errors: Checked["errors"] = {};
-  const changed = new Set<Field>();
-  const payload: Record<string, unknown> = { id: r.id };
-  /** 名前の文字を id にする。空・「なし」は null、見つからなければ undefined */
-  const lookup = <T,>(text: string, list: T[], nameOf: (t: T) => string, idOf: (t: T) => string) => {
-    const t = norm(text);
-    if (t === "" || t === "なし") return null;
-    const hit = list.find((x) => norm(nameOf(x)) === t);
-    return hit ? idOf(hit) : undefined;
-  };
+type Refs = { today: DateStr; groups: Group[]; members: Member[] };
 
+/** グループ・担当・通知・名前のマスを読む（新しい行と登録済みの行で同じ） */
+function readCommon(r: EditRow, { groups, members }: Refs) {
+  const errors: Checked["errors"] = {};
   const name = r.name.trim();
   if (!name) errors.name = "名前を入れてください";
   else if ([...name].length > 40) errors.name = "名前は40字までです";
-  if (name !== orig.name) {
-    changed.add("name");
-    payload.name = name;
+  const groupId = lookup(r.group, groups, (g) => g.name, (g) => g.id);
+  if (groupId === undefined) errors.group = `「${r.group.trim()}」というグループはありません`;
+  const assigneeUserId = lookup(r.assignee, members, (m) => m.displayName, (m) => m.userId);
+  if (assigneeUserId === undefined) errors.assignee = `「${r.assignee.trim()}」という人は Family にいません`;
+  const notifyTime = parseNotify(r.notify);
+  if (notifyTime === undefined) errors.notify = `「${r.notify.trim()}」は時刻として読めません（15 分きざみ、例 07:00）`;
+  return { errors, name, groupId, assigneeUserId, notifyTime };
+}
+
+/** 新しい行。期限は最初の期限（まとめて登録と同じ扱い） */
+function checkNew(r: EditRow, refs: Refs): Checked {
+  const { today } = refs;
+  const { errors, name, groupId, assigneeUserId, notifyTime } = readCommon(r, refs);
+  const dueText = r.due.trim();
+  const due = dueText ? parseDateText(dueText, today) : null;
+  if (dueText && !due) errors.due = `「${dueText}」は日付として読めません（例：2026-10-20、10/20）`;
+
+  let schedule: unknown;
+  let dueHint: string | undefined;
+  let dueDisabled = false;
+  const p = parseScheduleText(r.schedule, today);
+  if (!p.ok) errors.schedule = p.message;
+  else if (p.kind === "interval") {
+    dueHint = `今日 ${shortDate(today)}`;
+    schedule = { type: "interval", intervalDays: p.intervalDays, firstDueOn: due ?? today };
+  } else if (!p.needsAnchor) {
+    dueDisabled = true;
+    delete errors.due;
+    const next = evaluate({ type: "calendar", rule: { ...p.rule, anchor: today } as CalendarRule }, [], today).dueOn;
+    dueHint = next ? `次は ${shortDate(next)}` : undefined;
+    schedule = { type: "calendar", rule: p.rule };
+  } else {
+    dueHint = p.suggestedAnchor ? shortDate(p.suggestedAnchor) : undefined;
+    schedule = { type: "calendar", rule: { ...p.rule, anchor: due ?? p.suggestedAnchor ?? today } };
   }
 
+  if (!name) return { errors: {}, changed: new Set(), dueHint, dueDisabled };
+  const ok = Object.keys(errors).length === 0;
+  return { errors, changed: new Set(), dueHint, dueDisabled, payload: ok ? { name, groupId, assigneeUserId, notifyTime, schedule } : undefined };
+}
+
+/** 登録済みの行。期限は次の期限。変えた項目だけを送る */
+function checkExisting(r: EditRow, orig: EditRow, chore: ChoreView, refs: Refs): Checked {
+  const { today } = refs;
+  const common = readCommon(r, refs);
+  const errors = common.errors;
+  const changed = new Set<Field>();
+  const payload: Record<string, unknown> = { id: r.id };
+  // 変えていないマスの不備は出さない（元のままなら直せないこともあるので）
+  if (common.name !== orig.name) {
+    changed.add("name");
+    payload.name = common.name;
+  }
   if (norm(r.group) !== norm(orig.group)) {
     changed.add("group");
-    const groupId = lookup(r.group, groups, (g) => g.name, (g) => g.id);
-    if (groupId === undefined) errors.group = `「${r.group.trim()}」というグループはありません`;
-    payload.groupId = groupId;
-  }
+    payload.groupId = common.groupId;
+  } else delete errors.group;
   if (norm(r.assignee) !== norm(orig.assignee)) {
     changed.add("assignee");
-    const userId = lookup(r.assignee, members, (m) => m.displayName, (m) => m.userId);
-    if (userId === undefined) errors.assignee = `「${r.assignee.trim()}」という人は Family にいません`;
-    payload.assigneeUserId = userId;
-  }
-  const notify = parseNotify(r.notify);
-  if (notify === undefined) errors.notify = `「${r.notify.trim()}」は時刻として読めません（15 分きざみ、例 07:00）`;
-  if (notify !== (orig.notify || null)) {
+    payload.assigneeUserId = common.assigneeUserId;
+  } else delete errors.assignee;
+  if (common.notifyTime !== undefined && common.notifyTime !== (orig.notify || null)) {
     changed.add("notify");
-    payload.notifyTime = notify;
-  }
+    payload.notifyTime = common.notifyTime;
+  } else if (common.notifyTime === undefined) changed.add("notify");
   if (!!r.archived !== !!orig.archived) {
     changed.add("archived");
     payload.archived = !!r.archived;
@@ -165,12 +238,10 @@ function checkRow(r: EditRow, orig: EditRow, chore: ChoreView, today: DateStr, g
 
 const LEAVE_MESSAGE = "保存していない変更があります。この画面を離れると消えます。よろしいですか？";
 
-/** 表で直す。PC 幅では表、スマホ幅では案内だけ */
+/** 家事を表で編集。PC 幅では表、スマホ幅では1行ずつ足す画面 */
 export function ChoreTable({ family, nav }: { family: Family; nav: Nav }) {
   const wide = useWide();
   const [data, setData] = useState<Data | null>(null);
-  const [version, setVersion] = useState(0);
-  const [flash, setFlash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -181,74 +252,56 @@ export function ChoreTable({ family, nav }: { family: Family; nav: Nav }) {
         api<Member[]>("GET", `/families/${family.id}/members`),
       ]);
       setData({ ...d, groups, members });
-      setVersion((v) => v + 1);
     } catch (e) {
       setError(errorText(e));
     }
   }, [family.id]);
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (wide) void load();
+  }, [load, wide]);
 
-  const toList = (
-    <button className="btn btn--quiet" onClick={() => nav.go({ name: "chores" })}>
-      家事の一覧へ
-    </button>
-  );
-
-  if (!wide)
-    return (
-      <main className="page">
-        <h1>表で直す</h1>
-        <p className="notice">表で直すのは PC で（画面の広いところで）開いてください。スマホでは、家事の詳細から1つずつ直せます。</p>
-        {toList}
-      </main>
-    );
+  if (!wide) return <ChoreBulk family={family} nav={nav} />;
 
   return (
     <main className="page page--wide">
       <div className="page-head">
-        <h1>表で直す</h1>
-        {toList}
+        <h1>家事を表で編集</h1>
+        <button className="btn btn--quiet" onClick={() => nav.back({ name: "chores" })}>
+          家事の一覧へ
+        </button>
       </div>
       <p className="muted">
-        登録した家事を表でまとめて直します。変えたマスには印が付き、「保存」で変えた行だけが保存されます。範囲を選んで打ち、Ctrl（⌘）+Enter
-        で範囲の全部に同じ値が入ります。次の期限は、日数の周期と隔週・数か月ごとのときだけ変えられます。行の追加は「まとめて登録」から。「削除」にチェックした家事は、保存すると記録ごと消えます（残したいときは「無効」に）。
+        登録した家事を直し、下の新しい行（「新」の印）に書いて家事を足し、まとめて保存します。名前が空の新しい行は保存しません。Excel
+        やスプレッドシートから貼り付けもできます。範囲を選んで打ち、Ctrl（⌘）+Enter で範囲の全部に同じ値が入ります。期限は、登録済みの家事では次の期限、新しい行では最初の期限です（毎週・毎月は周期から決まります）。「削除」にチェックした家事は、保存すると記録ごと消えます（残したいときは「無効」に）。
       </p>
-      {flash && (
-        <p className="notice notice--ok" role="status">
-          {flash}
-        </p>
-      )}
       {error && !data && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
-      {!data ? (
-        !error && <p aria-busy="true">読み込んでいます…</p>
-      ) : data.chores.length === 0 ? (
-        <p className="muted">まだ家事がありません。</p>
-      ) : (
-        <ChoreTableGrid
-          key={version}
-          family={family}
-          data={data}
-          onSaved={(updated, deleted) => {
-            setFlash([updated && `${updated}件の家事を保存しました`, deleted && `${deleted}件の家事を削除しました`].filter(Boolean).join("。"));
-            void load();
-          }}
-          onEdit={() => setFlash(null)}
-        />
-      )}
+      {!data ? !error && <p aria-busy="true">読み込んでいます…</p> : <ChoreTableGrid family={family} nav={nav} data={data} />}
     </main>
   );
 }
 
-function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; data: Data; onSaved: (updated: number, deleted: number) => void; onEdit: () => void }) {
+/** 左端の行番号。新しい行は「新」 */
+function Gutter({ rowData, rowIndex }: CellProps<EditRow, unknown>) {
+  return isNew(rowData) ? (
+    <span className="bulk-grid__new" title={`${rowIndex + 1}行目（新しい行）`} data-gutter={rowIndex + 1}>
+      新
+    </span>
+  ) : (
+    <span data-gutter={rowIndex + 1}>{rowIndex + 1}</span>
+  );
+}
+
+function ChoreTableGrid({ family, nav, data }: { family: Family; nav: Nav; data: Data }) {
   const { groups, members } = data;
   const today = todayInTokyo();
+  const refs: Refs = useMemo(() => ({ today, groups, members }), [today, groups, members]);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  const [picking, setPicking] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -263,31 +316,35 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
     );
     return { initial: sorted.map(rowOf), byId: new Map(sorted.map((c) => [c.id, { chore: c, orig: rowOf(c) }])) };
   }, [data, groups]);
+  const existingNames = useMemo(() => data.chores.map((c) => c.name), [data]);
 
   const checksRef = useRef(new Map<string, Checked>());
   const sheet = useSheet<EditRow>({
     cols: COLS,
-    initial: () => initial,
+    initial: () => normalize(initial),
+    normalize,
     onCommit: (prevRows, next) => {
       const prev = new Map(prevRows.map((r) => [r.id, r]));
       setRowErrors((errs) => Object.fromEntries(Object.entries(errs).filter(([id]) => prev.get(id) === next.find((r) => r.id === id))));
-      onEdit();
     },
-    disabled: (field, r) => field === "due" && !!checksRef.current.get(r.id)?.dueDisabled,
+    disabled: (field, r) => ((field === "archived" || field === "delete") && isNew(r)) || (field === "due" && !!checksRef.current.get(r.id)?.dueDisabled),
   });
-  const { rows, undo } = sheet;
+  const { rows, commit, undo } = sheet;
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
 
   const checks = useMemo(
-    () => new Map(rows.map((r) => [r.id, checkRow(r, byId.get(r.id)!.orig, byId.get(r.id)!.chore, today, groups, members)])),
-    [rows, byId, today, groups, members],
+    () => new Map(rows.map((r) => [r.id, isNew(r) ? checkNew(r, refs) : checkExisting(r, byId.get(r.id)!.orig, byId.get(r.id)!.chore, refs)])),
+    [rows, byId, refs],
   );
   checksRef.current = checks;
 
   // 削除する行は、ほかのマスを変えていても消すだけ（変更としては数えない）
-  const deleteRows = rows.filter((r) => r.delete);
-  const changedRows = rows.filter((r) => !r.delete && checks.get(r.id)!.changed.size > 0);
+  const deleteRows = rows.filter((r) => !isNew(r) && r.delete);
+  const changedRows = rows.filter((r) => !isNew(r) && !r.delete && checks.get(r.id)!.changed.size > 0);
+  const createRows = rows.filter((r) => isNew(r) && !isBlankNew(r));
   const invalid = rows.filter((r) => !r.delete && Object.keys(checks.get(r.id)!.errors).length > 0);
-  const dirty = changedRows.length > 0 || deleteRows.length > 0;
+  const dirty = changedRows.length > 0 || deleteRows.length > 0 || createRows.length > 0;
 
   // 保存しないで離れようとしたら確かめる（アプリの中の移動・戻る・タブを閉じる・読み直す）
   useEffect(() => {
@@ -314,6 +371,7 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
       }
       const error = check?.errors[f];
       const out = { error, rowError: rowErrors[r.id], changed: check?.changed.has(f) };
+      if ((f === "archived" || f === "delete") && disabled) return { ...out, shown: <span className="bulk-grid__hint">—</span> };
       if (f === "notify" && !r.notify) return { ...out, shown: <span className="bulk-grid__hint">それぞれ</span> };
       if (f === "group" && !r.group) return { ...out, shown: <span className="bulk-grid__hint">なし</span> };
       if (f === "assignee" && !r.assignee) return { ...out, shown: <span className="bulk-grid__hint">なし</span> };
@@ -327,12 +385,36 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
     moveTo: sheet.moveTo,
   };
 
-  const badChanged = changedRows.filter((r) => !checks.get(r.id)!.payload);
+  /** 新しい行を末尾に足す（空の行の前に置かず、最後の空の行のあとに続ける） */
+  const appendBlank = (n: number) => {
+    const start = rows.length;
+    commit([...rows, ...Array.from({ length: n }, () => blankRow())]);
+    // 表を描き直してから、最初に足した行の名前のマスへ
+    requestAnimationFrame(() => sheet.gridRef.current?.setActiveCell({ row: start, col: NAME_COL }));
+  };
+
+  const addTemplates = (picked: ChoreTemplate[]) => {
+    const groupNames = new Set(groups.map((g) => g.name));
+    const added = picked.map((t) =>
+      blankRow({
+        name: t.name,
+        group: groupNames.has(t.group) ? t.group : "",
+        ...(t.schedule.type === "interval"
+          ? // 前にやった日は分からないので、今日から1周期あとを最初の期限にしておく
+            { schedule: `${t.schedule.intervalDays}日ごと`, due: addDays(today, t.schedule.intervalDays) }
+          : { schedule: describeRule({ kind: "weekly", weekdays: t.schedule.weekdays, every: 1, anchor: today }) }),
+      }),
+    );
+    commit([...rows.filter((r) => !isBlankNew(r)), ...added]);
+    setPicking(false);
+  };
+
+  const badRows = [...createRows, ...changedRows].filter((r) => !checks.get(r.id)!.payload);
 
   const save = async () => {
     setError(null);
-    if (badChanged.length) {
-      setError(`赤いマスを直してください（${badChanged.length}行）`);
+    if (badRows.length) {
+      setError(`赤いマスを直してください（${badRows.length}行）`);
       return;
     }
     if (deleteRows.length) {
@@ -343,17 +425,21 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
     setBusy(true);
     setRowErrors({});
     try {
-      const res = await api<{ updated: number; deleted: number }>("PATCH", `/families/${family.id}/chores/bulk`, {
+      const res = await api<{ created: number; updated: number; deleted: number }>("PATCH", `/families/${family.id}/chores/bulk`, {
+        create: createRows.map((r) => checks.get(r.id)!.payload),
         chores: changedRows.map((r) => checks.get(r.id)!.payload),
         deleteIds: deleteRows.map((r) => r.id),
       });
       setLeaveGuard(null);
-      onSaved(res.updated, res.deleted);
+      const parts = [res.created && `${res.created}件を追加`, res.updated && `${res.updated}件を変更`, res.deleted && `${res.deleted}件を削除`].filter(Boolean);
+      sessionStorage.setItem("kaji.flash", `${parts.join("・")}しました`);
+      nav.go({ name: "chores" });
     } catch (e) {
       if (e instanceof ApiError && e.code === "bulk_invalid" && e.detail?.rows) {
         const map: Record<string, string> = {};
-        for (const { index, message, kind } of e.detail.rows as { index: number; message: string; kind?: "delete" }[]) {
-          const r = (kind === "delete" ? deleteRows : changedRows)[index];
+        const lists = { create: createRows, update: changedRows, delete: deleteRows };
+        for (const { index, message, kind } of e.detail.rows as { index: number; message: string; kind: keyof typeof lists }[]) {
+          const r = lists[kind]?.[index];
           if (r) map[r.id] = message;
         }
         setRowErrors(map);
@@ -363,30 +449,68 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
     }
   };
 
-  // 表の下に出す、行ごとの直すところ
+  // 表の下に出す、行ごとの直すところ・注意
   const notes = rows.flatMap((r, i) => {
-    const out: { key: string; text: string }[] = [];
+    if (isBlankNew(r)) return [];
+    const out: { key: string; text: string; error: boolean }[] = [];
     const errs = r.delete ? {} : (checks.get(r.id)?.errors ?? {});
-    for (const c of COLS) if (errs[c.field]) out.push({ key: `${r.id}-${c.field}`, text: `${i + 1}行目（${r.name || "名前なし"}）・${c.title}：${errs[c.field]}` });
-    if (rowErrors[r.id]) out.push({ key: `${r.id}-server`, text: `${i + 1}行目（${r.name}）：${rowErrors[r.id]}` });
+    const label = `${i + 1}行目（${r.name.trim() || "名前なし"}）`;
+    for (const c of COLS) if (errs[c.field]) out.push({ key: `${r.id}-${c.field}`, text: `${label}・${c.title}：${errs[c.field]}`, error: true });
+    if (rowErrors[r.id]) out.push({ key: `${r.id}-server`, text: `${label}：${rowErrors[r.id]}`, error: true });
+    if (isNew(r) && existingNames.includes(r.name.trim())) out.push({ key: `${r.id}-dup`, text: `${label}：同じ名前の家事が、もうあります`, error: false });
     return out;
   });
 
+  const label = !dirty
+    ? "変更はありません"
+    : [createRows.length && `${createRows.length}件の追加`, changedRows.length && `${changedRows.length}件の変更`, deleteRows.length && `${deleteRows.length}件の削除`]
+        .filter(Boolean)
+        .join("・") + "を保存";
+
   return (
     <>
+      <div className="form-actions bulk-actions">
+        <button className="btn" onClick={() => setAdding(true)}>
+          行をまとめて追加
+        </button>
+        <button className="btn" onClick={() => setPicking(true)}>
+          よくある家事から選ぶ
+        </button>
+      </div>
       <SheetCtx.Provider value={ctx}>
         <div className="bulk-grid">
           <DataSheetGrid<EditRow>
             {...sheet.gridProps}
-            rowClassName={({ rowData }) => (rowData.delete ? "is-deleted" : undefined)}
-            lockRows height={ROW_HEIGHT * Math.min(rows.length + 1, 16) + 2} addRowsComponent={false} />
+            gutterColumn={{ component: Gutter, basis: 44, minWidth: 44 }}
+            rowClassName={({ rowData }) => (rowData.delete ? "is-deleted" : isNew(rowData) ? "is-new" : undefined)}
+            contextMenuComponent={(p) => {
+              // 登録済みの行は表から消さない（「削除」の列で消す）。行は登録済みの下に足す
+              const old = (row: number) => !!rowsRef.current[row] && !isNew(rowsRef.current[row]!);
+              const items = p.items.filter((it) => {
+                if (it.type === "DELETE_ROW" || it.type === "INSERT_ROW_BELLOW") return !old(p.cursorIndex.row);
+                if (it.type === "DELETE_ROWS") return !Array.from({ length: it.toRow - it.fromRow + 1 }, (_, i) => it.fromRow - 1 + i).some(old);
+                return true;
+              });
+              return <ContextMenu {...p} items={items} />;
+            }}
+            createRow={() => blankRow()}
+            duplicateRow={({ rowData: { id: _, ...rest } }) => blankRow({ ...rest, archived: "", delete: "" })}
+            disableSmartDelete
+            onActiveCellChange={({ cell }) => {
+              // カーソルが最後の行に入ったら、空の行をもう1つ足す
+              const cur = rowsRef.current;
+              if (cell && cell.row >= cur.length - 1) sheet.extend([...cur, blankRow()]);
+            }}
+            height={ROW_HEIGHT * Math.min(rows.length + 1, 16) + 2}
+            addRowsComponent={false}
+          />
         </div>
       </SheetCtx.Provider>
 
       {notes.length > 0 && (
         <ul className="bulk-notes">
           {notes.map((n) => (
-            <li key={n.key} className="error">
+            <li key={n.key} className={n.error ? "error" : "muted"}>
               {n.text}
             </li>
           ))}
@@ -399,19 +523,59 @@ function ChoreTableGrid({ family, data, onSaved, onEdit }: { family: Family; dat
       )}
       <div className="form-actions bulk-actions">
         <button className="btn btn--primary" disabled={busy || !dirty} onClick={() => void save()}>
-          {!dirty
-            ? "変更はありません"
-            : deleteRows.length === 0
-              ? `${changedRows.length}件の変更を保存`
-              : changedRows.length === 0
-                ? `${deleteRows.length}件の削除を保存`
-                : `${changedRows.length}件の変更・${deleteRows.length}件の削除を保存`}
+          {label}
         </button>
         <button className="btn btn--quiet" disabled={!sheet.canUndo} onClick={undo}>
           元に戻す
         </button>
         {invalid.length > 0 && <span className="error">赤いマスが {invalid.length}行にあります</span>}
       </div>
+
+      {adding && (
+        <AddRowsDialog
+          onCancel={() => setAdding(false)}
+          onAdd={(n) => {
+            setAdding(false);
+            appendBlank(n);
+          }}
+        />
+      )}
+      {picking && (
+        <TemplateDialog existing={[...existingNames, ...createRows.map((r) => r.name.trim())]} onCancel={() => setPicking(false)} onAdd={addTemplates} />
+      )}
     </>
+  );
+}
+
+/** 足す行の数を聞く小さな画面。Enter で追加、Esc でやめる */
+function AddRowsDialog({ onAdd, onCancel }: { onAdd: (n: number) => void; onCancel: () => void }) {
+  const [text, setText] = useState("5");
+  const { ref } = useModal(onCancel);
+  const n = Number(text);
+  const ok = Number.isInteger(n) && n >= 1 && n <= ADD_MAX;
+  return (
+    <dialog ref={ref} className="dialog" onClose={onCancel} aria-labelledby="add-rows-title">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (ok) onAdd(n);
+        }}
+      >
+        <h2 id="add-rows-title">行をまとめて追加</h2>
+        <label className="field field--short">
+          <span>足す行の数（1〜{ADD_MAX}）</span>
+          <input type="number" min={1} max={ADD_MAX} value={text} onChange={(e) => setText(e.target.value)} autoFocus onFocus={(e) => e.target.select()} />
+        </label>
+        {!ok && <p className="error">1〜{ADD_MAX}の数を入れてください</p>}
+        <div className="form-actions">
+          <button type="submit" className="btn btn--primary" disabled={!ok}>
+            追加
+          </button>
+          <button type="button" className="btn btn--quiet" onClick={() => ref.current?.close()}>
+            やめる
+          </button>
+        </div>
+      </form>
+    </dialog>
   );
 }

@@ -168,14 +168,14 @@ async function loadNamed(c: Ctx, id: string) {
 type ChoreInput = { name: unknown; schedule: unknown; assigneeUserId: unknown; groupId: unknown; notifyTime: unknown };
 
 /** 画面から来た1つの家事を確かめ、chores に入れる行にする（まだ入れない） */
-async function buildChoreRow(c: Ctx, fid: string, userId: string, b: Partial<ChoreInput>, today: DateStr) {
+async function buildChoreRow(c: Ctx, fid: string, userId: string, b: Partial<ChoreInput>, today: DateStr, refs?: FamilyRefs) {
   return {
     id: newId(),
     familyId: fid,
     name: validName(b.name),
     ...scheduleColumns(b.schedule, today),
-    assigneeUserId: await validAssignee(c, fid, b.assigneeUserId),
-    groupId: await validGroup(c, fid, b.groupId),
+    assigneeUserId: await validAssignee(c, fid, b.assigneeUserId, refs?.members),
+    groupId: await validGroup(c, fid, b.groupId, refs?.groups),
     notifyTime: validChoreNotify(b.notifyTime),
     createdBy: userId,
   };
@@ -270,27 +270,42 @@ export const choreRoutes = new Hono<AppEnv>()
     return c.json({ created: rows.length, ids: rows.map((r) => r.id) }, 201);
   })
   /**
-   * まとめて直す・消す。1行でも不備があれば1つも変えず・消さず、不備のある行を返す（POST の bulk と同じ形。
-   * 消す側の不備は kind: "delete" を付け、index は deleteIds の中の位置）。変更と削除は1つの batch で行う
+   * 表で編集：まとめて足す（create）・直す（chores）・消す（deleteIds）。1行でも不備があれば1つも変えず、不備のある行を返す
+   * （rows の kind は "create" | "update" | "delete"、index はそれぞれの配列の中の位置）。全部を1つの batch で行う
    */
   .patch("/families/:fid/chores/bulk", async (c) => {
     const fid = c.req.param("fid");
-    await requireMember(c, fid);
-    const { chores: rawInput, deleteIds: rawDelete } = await body<{ chores?: (ChorePatch & { id?: unknown })[]; deleteIds?: unknown[] }>(c);
+    const { userId } = await requireMember(c, fid);
+    const {
+      create: rawCreate,
+      chores: rawInput,
+      deleteIds: rawDelete,
+    } = await body<{ create?: Partial<ChoreInput>[]; chores?: (ChorePatch & { id?: unknown })[]; deleteIds?: unknown[] }>(c);
+    if (rawCreate !== undefined && !Array.isArray(rawCreate)) fail(400, "足す家事が正しくありません");
     if (rawInput !== undefined && !Array.isArray(rawInput)) fail(400, "直す家事が正しくありません");
     if (rawDelete !== undefined && !Array.isArray(rawDelete)) fail(400, "消す家事が正しくありません");
+    const create = rawCreate ?? [];
     const input = rawInput ?? [];
     const deleteIds = rawDelete ?? [];
-    if (input.length === 0 && deleteIds.length === 0) fail(400, "直す家事がありません");
-    if (input.length + deleteIds.length > BULK_EDIT_MAX) fail(400, `一度に直せる・消せるのは合わせて ${BULK_EDIT_MAX} 件までです`);
+    if (create.length === 0 && input.length === 0 && deleteIds.length === 0) fail(400, "直す家事がありません");
+    if (create.length + input.length + deleteIds.length > BULK_EDIT_MAX) fail(400, `一度に足せる・直せる・消せるのは合わせて ${BULK_EDIT_MAX} 件までです`);
     const db = c.get("db");
     const ids = [...new Set([...input.map((b) => b?.id), ...deleteIds].filter((id): id is string => typeof id === "string"))];
     const found = ids.length ? await db.select().from(chores).where(and(eq(chores.familyId, fid), inArray(chores.id, ids))).all() : [];
     const byId = new Map(found.map((r) => [r.id, r]));
     const refs = await familyRefs(c, fid);
     const today = todayInTokyo();
+    const errors: { kind: "create" | "update" | "delete"; index: number; message: string }[] = [];
+    const inserts: Awaited<ReturnType<typeof buildChoreRow>>[] = [];
+    for (const [index, b] of create.entries()) {
+      try {
+        inserts.push(await buildChoreRow(c, fid, userId, b ?? {}, today, refs));
+      } catch (e) {
+        if (!(e instanceof HTTPException)) throw e;
+        errors.push({ kind: "create", index, message: e.message });
+      }
+    }
     const updates: { id: string; set: Awaited<ReturnType<typeof buildChorePatch>> }[] = [];
-    const errors: { index: number; message: string; kind?: "delete" }[] = [];
     const seen = new Set<string>();
     for (const [index, b] of input.entries()) {
       try {
@@ -302,25 +317,26 @@ export const choreRoutes = new Hono<AppEnv>()
         updates.push({ id: chore.id, set: await buildChorePatch(c, chore, b, today, refs) });
       } catch (e) {
         if (!(e instanceof HTTPException)) throw e;
-        errors.push({ index, message: e.message });
+        errors.push({ kind: "update", index, message: e.message });
       }
     }
     const deletes: string[] = [];
     for (const [index, id] of deleteIds.entries()) {
       const chore = typeof id === "string" ? byId.get(id) : undefined;
-      if (!chore) errors.push({ index, message: "その家事はありません", kind: "delete" });
-      else if (deletes.includes(chore.id)) errors.push({ index, message: "同じ家事が2回あります", kind: "delete" });
-      else if (seen.has(chore.id)) errors.push({ index, message: "同じ家事を直すのと消すのを一度にはできません", kind: "delete" });
+      if (!chore) errors.push({ kind: "delete", index, message: "その家事はありません" });
+      else if (deletes.includes(chore.id)) errors.push({ kind: "delete", index, message: "同じ家事が2回あります" });
+      else if (seen.has(chore.id)) errors.push({ kind: "delete", index, message: "同じ家事を直すのと消すのを一度にはできません" });
       else deletes.push(chore.id);
     }
     if (errors.length) return c.json({ error: `${errors.length}件の行に不備があります`, code: "bulk_invalid", rows: errors }, 400);
     const [first, ...more] = [
+      ...inserts.map((r) => db.insert(chores).values(r)),
       ...updates.map((u) => db.update(chores).set(u.set).where(eq(chores.id, u.id))),
       // 記録も cascade で消える（DELETE /chores/:id と同じ）
       ...(deletes.length ? [db.delete(chores).where(and(eq(chores.familyId, fid), inArray(chores.id, deletes)))] : []),
     ];
     await db.batch([first!, ...more]);
-    return c.json({ updated: updates.length, deleted: deletes.length });
+    return c.json({ created: inserts.length, updated: updates.length, deleted: deletes.length });
   })
   .get("/chores/:id", async (c) => {
     const chore = await loadChore(c, c.req.param("id"));

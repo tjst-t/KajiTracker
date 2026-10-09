@@ -117,9 +117,14 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
         <section className="empty">
           <h2>まだ家事がありません</h2>
           <p>「ゴミ出し 毎週月・木」「エアコンのフィルター 90日ごと」のように、覚えておきたい家事を登録してください。</p>
-          <button className="btn btn--primary" onClick={() => nav.go({ name: "chore-new" })}>
-            家事を登録する
-          </button>
+          <div className="form-actions">
+            <button className="btn btn--primary" onClick={() => nav.go({ name: "chore-new" })}>
+              家事を登録する
+            </button>
+            <button className="btn" onClick={() => nav.go({ name: "chore-table" })}>
+              表でまとめて登録
+            </button>
+          </div>
         </section>
       ) : (
         <>

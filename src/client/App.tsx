@@ -8,14 +8,13 @@ import { InviteScreen } from "./screens/Invite";
 import { Login } from "./screens/Login";
 import { Settings } from "./screens/Settings";
 import { StatsScreen } from "./screens/Stats";
-import { ChoreBulk } from "./screens/ChoreBulk";
 import { ChoreDetail } from "./screens/ChoreDetail";
 import { ChoreForm } from "./screens/ChoreForm";
 import { ChoreTable } from "./screens/ChoreTable";
 import { Chores } from "./screens/Chores";
 import { TicketScreen } from "./screens/Ticket";
 import { Today } from "./screens/Today";
-import { type Nav, type Route, confirmLeave, pathOf, routeOf, tabOf } from "./router";
+import { type Nav, type Route, confirmLeave, fixPath, pathOf, routeOf, tabOf } from "./router";
 
 // 札・招待はページを開いた瞬間に URL から抜いておく（描画より前に）
 const initialFragment = takeFragmentFromUrl();
@@ -37,7 +36,7 @@ export function App() {
   const [families, setFamilies] = useState<Family[] | undefined>(undefined);
   const [currentId, setCurrentId] = useState<string | null>(localStorage.getItem(FAMILY_KEY));
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [route, setRoute] = useState<Route>(routeOf(location.pathname));
+  const [route, setRoute] = useState<Route>(() => fixPath(routeOf(location.pathname)));
   const routeRef = useRef(route);
   routeRef.current = route;
 
@@ -82,7 +81,7 @@ export function App() {
     const onPop = () => {
       // 保存していない変更を残して戻るのをやめたら、URL を元の画面に戻す
       if (!confirmLeave()) return history.pushState(null, "", pathOf(routeRef.current));
-      setRoute(routeOf(location.pathname));
+      setRoute(fixPath(routeOf(location.pathname)));
     };
     addEventListener("popstate", onPop);
     return () => removeEventListener("popstate", onPop);
@@ -182,8 +181,6 @@ export function App() {
         <StatsScreen family={family} />
       ) : route.name === "chores" ? (
         <Chores family={family} nav={nav} />
-      ) : route.name === "chore-bulk" ? (
-        <ChoreBulk family={family} nav={nav} />
       ) : route.name === "chore-table" ? (
         <ChoreTable family={family} nav={nav} />
       ) : route.name === "chore-new" ? (

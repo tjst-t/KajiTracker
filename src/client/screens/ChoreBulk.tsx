@@ -9,7 +9,6 @@ import { type CalState, CalendarFields, anchorOfCal, calValid, initialCal, ruleF
 import { TemplateDialog, useModal } from "../components/TemplateDialog";
 import { errorText } from "../format";
 import type { Nav } from "../router";
-import { ChoreBulkGrid } from "./ChoreBulkGrid";
 
 type Row = {
   key: number;
@@ -49,11 +48,10 @@ export function useWide() {
   return wide;
 }
 
-export type BulkData = { groups: Group[]; members: Member[]; existing: string[] };
+type BulkData = { groups: Group[]; members: Member[]; existing: string[] };
 
-/** まとめて登録。PC 幅ではエクセルのような表、スマホ幅では1行ずつの入力欄 */
+/** スマホ幅のまとめて登録（1行ずつの入力欄）。PC 幅では「家事を表で編集」の表になる（ChoreTable） */
 export function ChoreBulk({ family, nav }: { family: Family; nav: Nav }) {
-  const wide = useWide();
   const [groups, setGroups] = useState<Group[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [existing, setExisting] = useState<string[]>([]);
@@ -64,8 +62,7 @@ export function ChoreBulk({ family, nav }: { family: Family; nav: Nav }) {
       .then((d) => setExisting(d.chores.map((c) => c.name)))
       .catch(() => {});
   }, [family.id]);
-  const data = { groups, members, existing };
-  return wide ? <ChoreBulkGrid family={family} nav={nav} data={data} /> : <ChoreBulkRows family={family} nav={nav} data={data} />;
+  return <ChoreBulkRows family={family} nav={nav} data={{ groups, members, existing }} />;
 }
 
 /** スマホ幅：1行が1つの家事。名前が空の行は登録しない */

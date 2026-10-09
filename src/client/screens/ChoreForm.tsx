@@ -112,10 +112,10 @@ export function ChoreForm({ family, nav, editId }: { family: Family; nav: Nav; e
         <p className="muted">
           いくつも登録するなら、
           <a
-            href="/chores/bulk"
+            href="/chores/table"
             onClick={(e) => {
               e.preventDefault();
-              nav.go({ name: "chore-bulk" });
+              nav.go({ name: "chore-table" });
             }}
           >
             表でまとめて登録

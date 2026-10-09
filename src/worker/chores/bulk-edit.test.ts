@@ -17,8 +17,10 @@ async function setup() {
   const add = async (name: string, b: object = {}) => (await takumi.post(`/api/families/${fam.id}/chores`, { name, schedule: interval(7), ...b })).json as { id: string };
   const get = async (id: string) => (await takumi.get(`/api/chores/${id}`)).json;
   const bulk = (chores: unknown[], d: TestDevice = takumi) => d.patch(`/api/families/${fam.id}/chores/bulk`, { chores });
+  const edit = (b: { create?: unknown[]; chores?: unknown[]; deleteIds?: unknown[] }, d: TestDevice = takumi) => d.patch(`/api/families/${fam.id}/chores/bulk`, b);
+  const list = async () => ((await takumi.get(`/api/families/${fam.id}/chores?archived=1`)).json.chores as { id: string; name: string }[]).map((c) => c.name).sort();
   const bulkDel = (chores: unknown[], deleteIds: unknown[], d: TestDevice = takumi) => d.patch(`/api/families/${fam.id}/chores/bulk`, { chores, deleteIds });
-  return { takumi, wife, fam, byName, add, get, bulk, bulkDel };
+  return { takumi, wife, fam, byName, add, get, bulk, bulkDel, edit, list };
 }
 
 describe("家事をまとめて直す（PATCH /families/:fid/chores/bulk）", () => {
@@ -33,7 +35,7 @@ describe("家事をまとめて直す（PATCH /families/:fid/chores/bulk）", ()
       { id: c.id, assigneeUserId: wife.userId, archived: true },
     ]);
     expect(r.status).toBe(200);
-    expect(r.json).toEqual({ updated: 3, deleted: 0 });
+    expect(r.json).toEqual({ created: 0, updated: 3, deleted: 0 });
     expect(await get(a.id)).toMatchObject({ name: "ゴミ出し", assigneeName: "はなこ", groupName: "ゴミ捨て", notifyTime: "07:00", schedule: { intervalDays: 7 } });
     expect(await get(b.id)).toMatchObject({ name: "お風呂", assigneeName: "はなこ", notifyTime: "21:15", schedule: { intervalDays: 3 }, dueOn: addDays(today(), 2) });
     expect(await get(c.id)).toMatchObject({ assigneeUserId: wife.userId, archived: true });
@@ -73,9 +75,9 @@ describe("家事をまとめて直す（PATCH /families/:fid/chores/bulk）", ()
     const r = await bulk([{ id: mine.id, name: "x" }, { id: theirs.id, name: "乗っ取り" }, { id: "nope" }, { name: "id なし" }]);
     expect(r.status).toBe(400);
     expect(r.json.rows).toEqual([
-      { index: 1, message: "その家事はありません" },
-      { index: 2, message: "その家事はありません" },
-      { index: 3, message: "その家事はありません" },
+      { kind: "update", index: 1, message: "その家事はありません" },
+      { kind: "update", index: 2, message: "その家事はありません" },
+      { kind: "update", index: 3, message: "その家事はありません" },
     ]);
     expect((await get(mine.id)).name).toBe("ゴミ出し");
     expect((await other.get(`/api/chores/${theirs.id}`)).json.name).toBe("よその家事");
@@ -104,7 +106,7 @@ describe("家事をまとめて直す（PATCH /families/:fid/chores/bulk）", ()
   });
 });
 
-describe("表で直す画面からまとめて消す（PATCH /families/:fid/chores/bulk の deleteIds）", () => {
+describe("表で編集からまとめて消す（PATCH /families/:fid/chores/bulk の deleteIds）", () => {
   const logCount = async (choreId: string) => (await env.DB.prepare("SELECT count(*) AS n FROM logs WHERE chore_id = ?").bind(choreId).first<{ n: number }>())!.n;
 
   it("消すだけ。記録も消える", async () => {
@@ -117,7 +119,7 @@ describe("表で直す画面からまとめて消す（PATCH /families/:fid/chor
 
     const r = await bulkDel([], [a.id, b.id]);
     expect(r.status).toBe(200);
-    expect(r.json).toEqual({ updated: 0, deleted: 2 });
+    expect(r.json).toEqual({ created: 0, updated: 0, deleted: 2 });
     expect((await takumi.get(`/api/chores/${a.id}`)).status).toBe(404);
     expect((await takumi.get(`/api/chores/${b.id}`)).status).toBe(404);
     expect((await takumi.get(`/api/chores/${keep.id}`)).status).toBe(200);
@@ -131,12 +133,12 @@ describe("表で直す画面からまとめて消す（PATCH /families/:fid/chor
     const c = await add("窓ふき");
     const r = await bulkDel([{ id: a.id, name: "燃えるゴミ" }], [b.id]);
     expect(r.status).toBe(200);
-    expect(r.json).toEqual({ updated: 1, deleted: 1 });
+    expect(r.json).toEqual({ created: 0, updated: 1, deleted: 1 });
     expect((await get(a.id)).name).toBe("燃えるゴミ");
     expect((await takumi.get(`/api/chores/${b.id}`)).status).toBe(404);
 
     const r2 = await takumi.patch(`/api/families/${fam.id}/chores/bulk`, { deleteIds: [c.id] });
-    expect(r2.json).toEqual({ updated: 0, deleted: 1 });
+    expect(r2.json).toEqual({ created: 0, updated: 0, deleted: 1 });
   });
 
   it("よその Family の家事・無い家事は消せない（400、kind: delete で位置を返す）。よその人は 404", async () => {
@@ -150,9 +152,9 @@ describe("表で直す画面からまとめて消す（PATCH /families/:fid/chor
     expect(r.status).toBe(400);
     expect(r.json.code).toBe("bulk_invalid");
     expect(r.json.rows).toEqual([
-      { index: 1, message: "その家事はありません", kind: "delete" },
-      { index: 2, message: "その家事はありません", kind: "delete" },
-      { index: 3, message: "その家事はありません", kind: "delete" },
+      { kind: "delete", index: 1, message: "その家事はありません" },
+      { kind: "delete", index: 2, message: "その家事はありません" },
+      { kind: "delete", index: 3, message: "その家事はありません" },
     ]);
     expect((await get(mine.id)).name).toBe("ゴミ出し");
     expect((await other.get(`/api/chores/${theirs.id}`)).status).toBe(200);
@@ -166,7 +168,7 @@ describe("表で直す画面からまとめて消す（PATCH /families/:fid/chor
     const a = await add("ゴミ出し");
     const r = await bulkDel([{ id: a.id, name: "x" }], [a.id]);
     expect(r.status).toBe(400);
-    expect(r.json.rows).toEqual([{ index: 0, message: expect.stringContaining("一度には"), kind: "delete" }]);
+    expect(r.json.rows).toEqual([{ kind: "delete", index: 0, message: expect.stringContaining("一度には") }]);
     expect((await get(a.id)).name).toBe("ゴミ出し");
   });
 
@@ -177,7 +179,7 @@ describe("表で直す画面からまとめて消す（PATCH /families/:fid/chor
     await takumi.post(`/api/chores/${b.id}/logs`, {});
     const r = await bulkDel([{ id: a.id, schedule: interval(0) }], [b.id]);
     expect(r.status).toBe(400);
-    expect(r.json.rows).toEqual([{ index: 0, message: expect.any(String) }]);
+    expect(r.json.rows).toEqual([{ kind: "update", index: 0, message: expect.any(String) }]);
     expect((await get(b.id)).name).toBe("風呂掃除");
     expect(await logCount(b.id)).toBe(1);
     expect((await get(a.id)).schedule.intervalDays).toBe(7);
@@ -188,5 +190,71 @@ describe("表で直す画面からまとめて消す（PATCH /families/:fid/chor
     const a = await add("x");
     expect((await bulkDel([], [])).status).toBe(400);
     expect((await bulkDel(Array.from({ length: 150 }, () => ({ id: a.id })), Array.from({ length: 51 }, () => a.id))).status).toBe(400);
+  });
+});
+
+describe("表で編集：足す・直す・消すを一度に（PATCH /families/:fid/chores/bulk の create）", () => {
+  it("足すだけ", async () => {
+    const { wife, byName, edit, list } = await setup();
+    const r = await edit({
+      create: [
+        { name: "ゴミ出し", schedule: { type: "calendar", rule: { kind: "weekly", weekdays: [1, 4] } }, groupId: byName["ゴミ捨て"], assigneeUserId: wife.userId },
+        { name: "風呂掃除", schedule: interval(3, addDays(today(), 1)), notifyTime: "21:00" },
+      ],
+    });
+    expect(r.status).toBe(200);
+    expect(r.json).toEqual({ created: 2, updated: 0, deleted: 0 });
+    expect(await list()).toEqual(["ゴミ出し", "風呂掃除"].sort());
+  });
+
+  it("足す・直す・消すを1回で", async () => {
+    const { takumi, wife, add, get, edit, list } = await setup();
+    const a = await add("ゴミ出し");
+    const b = await add("窓ふき");
+    const r = await edit({ create: [{ name: "風呂掃除", schedule: interval(3) }, { name: "排水口", schedule: interval(14) }], chores: [{ id: a.id, assigneeUserId: wife.userId }], deleteIds: [b.id] });
+    expect(r.status).toBe(200);
+    expect(r.json).toEqual({ created: 2, updated: 1, deleted: 1 });
+    expect(await get(a.id)).toMatchObject({ assigneeName: "はなこ" });
+    expect((await takumi.get(`/api/chores/${b.id}`)).status).toBe(404);
+    expect(await list()).toEqual(["ゴミ出し", "排水口", "風呂掃除"].sort());
+  });
+
+  it("足す行に不備があれば、何も足さず・直さず・消さない。rows に kind が付く", async () => {
+    const { takumi, wife, add, get, edit, list } = await setup();
+    const a = await add("ゴミ出し");
+    const b = await add("窓ふき");
+    const stranger = await bootstrapUser("他人");
+    const r = await edit({
+      create: [{ name: "風呂掃除", schedule: interval(3) }, { name: "", schedule: interval(3) }, { name: "排水口", schedule: interval(7), assigneeUserId: stranger.userId }],
+      chores: [{ id: a.id, assigneeUserId: wife.userId }, { id: "nope", name: "x" }],
+      deleteIds: [b.id],
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.code).toBe("bulk_invalid");
+    expect(r.json.rows).toEqual([
+      { kind: "create", index: 1, message: expect.stringContaining("名前") },
+      { kind: "create", index: 2, message: expect.stringContaining("担当者") },
+      { kind: "update", index: 1, message: "その家事はありません" },
+    ]);
+    expect(await get(a.id)).toMatchObject({ assigneeUserId: null });
+    expect((await takumi.get(`/api/chores/${b.id}`)).status).toBe(200);
+    expect(await list()).toEqual(["ゴミ出し", "窓ふき"].sort());
+
+    // 足す行だけに不備があっても同じ
+    const r2 = await edit({ create: [{ name: "風呂掃除", schedule: interval(0) }], chores: [{ id: a.id, name: "燃えるゴミ" }], deleteIds: [b.id] });
+    expect(r2.status).toBe(400);
+    expect(r2.json.rows).toEqual([{ kind: "create", index: 0, message: expect.any(String) }]);
+    expect((await get(a.id)).name).toBe("ゴミ出し");
+    expect((await takumi.get(`/api/chores/${b.id}`)).status).toBe(200);
+  });
+
+  it("3つとも空・合わせて多すぎる・create が配列でないときは断る。よその人は 404", async () => {
+    const { fam, add, edit } = await setup();
+    const a = await add("x");
+    expect((await edit({ create: [], chores: [], deleteIds: [] })).status).toBe(400);
+    expect((await edit({ create: "x" as never })).status).toBe(400);
+    expect((await edit({ create: Array.from({ length: 101 }, (_, i) => ({ name: `家事${i}`, schedule: interval(7) })), chores: Array.from({ length: 100 }, () => ({ id: a.id })) })).status).toBe(400);
+    const other = await bootstrapUser("他人");
+    expect((await other.patch(`/api/families/${fam.id}/chores/bulk`, { create: [{ name: "y", schedule: interval(7) }] })).status).toBe(404);
   });
 });

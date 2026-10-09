@@ -158,10 +158,11 @@ try {
 
   // ---- まとめて登録：よくある家事から選ぶ＋手で1行（曜日で）＋不備の行 ----
   step = "bulk";
-  // PC 幅のまとめて登録は表（bulk-grid-flow で確かめる）。ここではスマホ幅の1行ずつの画面を通す
+  // PC 幅は「家事を表で編集」の表（bulk-grid-flow で確かめる）。ここではスマホ幅の1行ずつの画面を、登録フォームのリンクから通す
   await pcPage.setViewportSize({ width: 600, height: 900 });
   await pcPage.getByRole("button", { name: "家事", exact: true }).click();
-  await pcPage.getByRole("button", { name: "まとめて登録" }).click();
+  await pcPage.getByRole("button", { name: "家事を登録" }).click();
+  await pcPage.getByRole("link", { name: "表でまとめて登録" }).click();
   await h1(pcPage, "まとめて登録");
   await pcPage.getByRole("button", { name: "よくある家事から選ぶ" }).click();
   await pcPage.getByRole("heading", { name: "よくある家事から選ぶ" }).waitFor();

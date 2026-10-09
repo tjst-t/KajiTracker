@@ -1,4 +1,4 @@
-// エクセルのような表の部品（まとめて登録・表で直すで使う）。react-datasheet-grid の上に、マスで選ぶ小さな画面・
+// エクセルのような表の部品（家事を表で編集で使う）。react-datasheet-grid の上に、マスで選ぶ小さな画面・
 // 範囲に同じ値（Ctrl/⌘+Enter）・元に戻すを足す。マスの値はすべて文字で持つ（貼り付け・コピーがそのまま効くように）。
 import "react-datasheet-grid/dist/style.css";
 import { type ReactNode, type RefObject, createContext, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
@@ -109,9 +109,9 @@ function SheetCell({ rowData, rowIndex, columnIndex, focus, active, disabled, co
         document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       }}
     >
-      {c.picker === "check" ? (
+      {c.picker === "check" && override === undefined ? (
         <input type="checkbox" className="dsg-checkbox" tabIndex={-1} checked={!!value} disabled={disabled} aria-label={label} onChange={() => null} />
-      ) : focus ? (
+      ) : focus && c.picker !== "check" ? (
         <input
           ref={inputRef}
           className="dsg-input"
@@ -350,7 +350,7 @@ export const ROW_HEIGHT = 40;
 type SheetOptions<R extends SheetRow> = {
   cols: SheetCol[];
   initial: () => R[];
-  /** 変えた行の並びを整える（まとめて登録で、末尾に空の行を足すなど） */
+  /** 変えた行の並びを整える（末尾に空の行を足すなど） */
   normalize?: (next: R[]) => R[];
   /** 変えたあとに呼ぶ（行の不備の知らせを消すなど） */
   onCommit?: (prev: R[], next: R[]) => void;
@@ -402,6 +402,8 @@ export function useSheet<R extends SheetRow>(o: SheetOptions<R>) {
     setRows(last);
   };
   const undo = () => restore(undoRef, redoRef);
+  /** 元に戻すの単位にしないで行を変える（カーソルが最後の行に入ったら空の行を足す、など） */
+  const extend = (next: R[]) => setRows(next);
   const redo = () => restore(redoRef, undoRef);
 
   /** 範囲（無ければそのマス）の全部に入れる。field ごとに値を決める */
@@ -499,6 +501,7 @@ export function useSheet<R extends SheetRow>(o: SheetOptions<R>) {
   return {
     rows,
     commit,
+    extend,
     undo,
     canUndo: undoRef.current.length > 0,
     gridRef,

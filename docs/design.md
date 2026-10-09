@@ -255,7 +255,7 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
 
 - `GET /families/:fid/groups`、`POST /families/:fid/groups`、`PATCH /groups/:id`（名前・並び順）、`DELETE /groups/:id`（家事はグループなしに）
 - `POST /families/:fid/chores/bulk`（まとめて登録。1行でも不備があれば1件も入れず、`rows: [{index, message}]` を返す。100件まで）
-- `PATCH /families/:fid/chores/bulk`（表で直す。`{ chores: [{ id, name?, schedule?, groupId?, assigneeUserId?, notifyTime?, archived? }] }`。来なかった項目は変えない。よその Family の家事・不備が1行でもあれば1件も変えず `bulk_invalid` の 400。周期の基準日は `PATCH /chores/:id` と同じく引き継ぐ。`deleteIds?: string[]` で一緒に消せる（記録も cascade で消える。変更と削除は1つの batch。消す側の不備は `kind: "delete"` と deleteIds の中の位置。同じ家事を両方に入れると 400）。返り値は `{ updated, deleted }`。変更と削除を合わせて200件まで）
+- `PATCH /families/:fid/chores/bulk`（表で編集。`{ create?: ChoreInput[], chores?: [{ id, name?, schedule?, groupId?, assigneeUserId?, notifyTime?, archived? }], deleteIds?: string[] }` で、足す・直す・消すを1つの batch で行う（どれか失敗したら全部戻る）。chores は来なかった項目は変えない。周期の基準日は `PATCH /chores/:id` と同じく引き継ぐ。消すと記録も cascade で消える。よその Family の家事・不備が1行でもあれば1件も変えず `bulk_invalid` の 400、`rows: [{ kind: "create"|"update"|"delete", index, message }]`（index はそれぞれの配列の中の位置）。同じ家事を直すのと消すの両方に入れると 400。3つとも空なら 400。返り値は `{ created, updated, deleted }`。合わせて200件まで）
 
 **統計**
 - `GET /families/:fid/stats?from=&to=`（日本時間の日付、両端を含む。省いた側は今月の初日・末日）。計算は `src/shared/stats.ts`

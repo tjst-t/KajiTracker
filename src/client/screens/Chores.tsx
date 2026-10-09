@@ -17,7 +17,7 @@ export function Chores({ family, nav }: { family: Family; nav: Nav }) {
   const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wide = useWide();
-  // まとめて登録・表で直すから戻ってきたときの知らせ
+  // 表で編集から戻ってきたときの知らせ
   const [flash] = useState(() => {
     const f = sessionStorage.getItem("kaji.flash");
     sessionStorage.removeItem("kaji.flash");
@@ -55,12 +55,9 @@ export function Chores({ family, nav }: { family: Family; nav: Nav }) {
         <div className="form-actions">
           {wide && (
             <button className="btn" onClick={() => nav.go({ name: "chore-table" })}>
-              表で直す
+              表で編集
             </button>
           )}
-          <button className="btn" onClick={() => nav.go({ name: "chore-bulk" })}>
-            まとめて登録
-          </button>
           <button className="btn btn--primary" onClick={() => nav.go({ name: "chore-new" })}>
             家事を登録
           </button>
@@ -100,7 +97,19 @@ export function Chores({ family, nav }: { family: Family; nav: Nav }) {
 
       {data && data.chores.length === 0 && (
         <section className="empty">
-          <p>まだ家事がありません。「まとめて登録」なら、よくある家事の候補から選んで一度に足せます。</p>
+          <p>
+            まだ家事がありません。
+            <a
+              href="/chores/table"
+              onClick={(e) => {
+                e.preventDefault();
+                nav.go({ name: "chore-table" });
+              }}
+            >
+              表でまとめて登録
+            </a>
+            すると、よくある家事の候補から選んで一度に足せます。
+          </p>
         </section>
       )}
       {data && data.chores.length > 0 && sections.length === 0 && <p className="muted">このグループの家事はありません。</p>}
