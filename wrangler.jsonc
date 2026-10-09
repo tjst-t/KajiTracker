@@ -26,5 +26,24 @@
   },
   // Web Push の鍵。ローカルは .dev.vars、本番は wrangler secret put で入れる（README）
   "secrets": { "required": ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"] },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // 本番（https://kaji.tjstkm.net）。`npm run deploy` は CLOUDFLARE_ENV=production でビルドしてから出す。
+  // 上の設定はローカルとテスト用（ローカルの D1 は上の database_id で場所が決まるので、変えない）
+  "env": {
+    "production": {
+      "name": "kajitracker",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "kajitracker",
+          "database_id": "09bfa015-113f-458f-ac02-fbbd43bed36f",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "triggers": { "crons": ["*/15 * * * *"] },
+      "vars": { "ORIGINS": "https://kaji.tjstkm.net" },
+      "routes": [{ "pattern": "kaji.tjstkm.net", "custom_domain": true }],
+      "workers_dev": false
+    }
+  }
 }

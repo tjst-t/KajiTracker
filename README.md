@@ -64,3 +64,16 @@ curl "http://localhost:8787/__scheduled?cron=*/15+*+*+*+*"
 
 送った家事は `notifications_sent` に入り、同じ期限ではもう送らない。試し直すときはその行を消す
 （`npx wrangler d1 execute DB --local --command "DELETE FROM notifications_sent"`）。
+
+## 本番（https://kaji.tjstkm.net）
+
+Cloudflare の API トークンは Vault の `CLOUDFLARE_API_TOKEN`、アカウントは `CLOUDFLARE_ACCOUNT_ID`。
+本番の設定は `wrangler.jsonc` の `env.production`（D1 は `kajitracker`、カスタムドメイン `kaji.tjstkm.net`、Cron 15分ごと）。
+
+```sh
+npm run db:migrate:remote   # 本番の D1 にマイグレーション
+npm run deploy              # CLOUDFLARE_ENV=production でビルドして出す
+npm run bootstrap-link -- --remote --origin https://kaji.tjstkm.net   # 最初の1人のリンク
+```
+
+Web Push の鍵は本番の secret（`wrangler secret put VAPID_PUBLIC_KEY --env production` など）。作り直すと、いまの通知の登録は全部使えなくなる。

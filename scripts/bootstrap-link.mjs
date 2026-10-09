@@ -24,7 +24,7 @@ execFileSync(
     "d1",
     "execute",
     "DB",
-    remote ? "--remote" : "--local",
+    ...(remote ? ["--remote", "--env", "production"] : ["--local"]),
     "--command",
     `INSERT INTO login_tickets (id, kind, expires_at) VALUES ('${hash}', 'bootstrap', '${expiresAt}')`,
   ],
