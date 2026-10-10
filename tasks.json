@@ -594,7 +594,7 @@
       "number": 26,
       "kind": "bug",
       "title": "iPhone の Safari でパスキーを作ると「取り消されました」になる（ボタンを押してから通信を待っている）",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [],
       "milestone": null,
@@ -606,7 +606,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-10T02:48:38.385Z",
-      "updatedAt": "2026-10-10T02:48:38.385Z",
+      "updatedAt": "2026-10-10T02:48:40.422Z",
       "closedAt": null,
       "extra": {}
     }
