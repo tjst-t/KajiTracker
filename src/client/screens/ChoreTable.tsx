@@ -36,6 +36,8 @@ const NAME_COL = COLS.findIndex((c) => c.field === "name");
 const ADD_MAX = 100;
 
 type Data = { today: DateStr; chores: ChoreView[]; groups: Group[]; members: Member[] };
+/** 「保存して編集を続ける」で表を作り直すときに引き継ぐもの */
+type Keep = { notice: string; windowY: number; gridY: number; cell: { rowId: string; row: number; col: number } | null };
 
 let seq = 0;
 const NEW = "new-";
@@ -243,19 +245,38 @@ export function ChoreTable({ family, nav }: { family: Family; nav: Nav }) {
   const wide = useWide();
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** 表を作り直すたびに増やす（ChoreTableGrid の key） */
+  const [version, setVersion] = useState(0);
+  const [keep, setKeep] = useState<Keep | null>(null);
 
+  const fetchData = useCallback(async (): Promise<Data> => {
+    const [d, groups, members] = await Promise.all([
+      api<{ today: DateStr; chores: ChoreView[] }>("GET", `/families/${family.id}/chores?archived=1`),
+      api<Group[]>("GET", `/families/${family.id}/groups`),
+      api<Member[]>("GET", `/families/${family.id}/members`),
+    ]);
+    return { ...d, groups, members };
+  }, [family.id]);
   const load = useCallback(async () => {
     try {
-      const [d, groups, members] = await Promise.all([
-        api<{ today: DateStr; chores: ChoreView[] }>("GET", `/families/${family.id}/chores?archived=1`),
-        api<Group[]>("GET", `/families/${family.id}/groups`),
-        api<Member[]>("GET", `/families/${family.id}/members`),
-      ]);
-      setData({ ...d, groups, members });
+      setData(await fetchData());
     } catch (e) {
       setError(errorText(e));
     }
-  }, [family.id]);
+  }, [fetchData]);
+
+  /** 保存できたあと画面に残る：読み直して表を作り直す（データと key を同時に変える）。読めなければ一覧へ */
+  const reload = async (k: Keep) => {
+    try {
+      const d = await fetchData();
+      setData(d);
+      setKeep(k);
+      setVersion((v) => v + 1);
+    } catch {
+      sessionStorage.setItem("kaji.flash", k.notice);
+      nav.go({ name: "chores" });
+    }
+  };
   useEffect(() => {
     if (wide) void load();
   }, [load, wide]);
@@ -279,7 +300,7 @@ export function ChoreTable({ family, nav }: { family: Family; nav: Nav }) {
           {error}
         </p>
       )}
-      {!data ? !error && <p aria-busy="true">読み込んでいます…</p> : <ChoreTableGrid family={family} nav={nav} data={data} />}
+      {!data ? !error && <p aria-busy="true">読み込んでいます…</p> : <ChoreTableGrid key={version} family={family} nav={nav} data={data} keep={keep} onSavedContinue={reload} />}
     </main>
   );
 }
@@ -295,7 +316,19 @@ function Gutter({ rowData, rowIndex }: CellProps<EditRow, unknown>) {
   );
 }
 
-function ChoreTableGrid({ family, nav, data }: { family: Family; nav: Nav; data: Data }) {
+function ChoreTableGrid({
+  family,
+  nav,
+  data,
+  keep,
+  onSavedContinue,
+}: {
+  family: Family;
+  nav: Nav;
+  data: Data;
+  keep: Keep | null;
+  onSavedContinue: (k: Keep) => Promise<void>;
+}) {
   const { groups, members } = data;
   const today = todayInTokyo();
   const refs: Refs = useMemo(() => ({ today, groups, members }), [today, groups, members]);
@@ -304,6 +337,7 @@ function ChoreTableGrid({ family, nav, data }: { family: Family; nav: Nav; data:
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState(keep?.notice ?? null);
 
   // 無効のものは後ろ、グループの並び順（グループなしは最後）、名前の順
   const { initial, byId } = useMemo(() => {
@@ -332,6 +366,31 @@ function ChoreTableGrid({ family, nav, data }: { family: Family; nav: Nav; data:
   const { rows, commit, undo } = sheet;
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
+  /** 最後に選んでいたマス（ボタンを押すと表の選択は外れるので覚えておく） */
+  const lastCellRef = useRef<Keep["cell"]>(null);
+  /** 選んでいたマスに戻したとき（次の1回は、最後の行でも空の行を足さない） */
+  const restoringRef = useRef(false);
+
+  // 作り直した表では、前のスクロールの位置と選んでいたマスに戻す（行は同じ家事があればその行、無ければ同じ番号の行）
+  useEffect(() => {
+    if (!keep) return;
+    scrollTo({ top: keep.windowY });
+    requestAnimationFrame(() => {
+      const scroller = document.querySelector<HTMLElement>(".bulk-grid .dsg-container");
+      if (scroller) scroller.scrollTop = keep.gridY;
+      const c = keep.cell;
+      if (!c) return;
+      const cur = rowsRef.current;
+      const i = cur.findIndex((r) => r.id === c.rowId);
+      restoringRef.current = true;
+      sheet.gridRef.current?.setActiveCell({ row: i >= 0 ? i : Math.min(c.row, cur.length - 1), col: c.col });
+      requestAnimationFrame(() => {
+        if (scroller) scroller.scrollTop = keep.gridY;
+      });
+    });
+    // 作り直したときに1回だけ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const checks = useMemo(
     () => new Map(rows.map((r) => [r.id, isNew(r) ? checkNew(r, refs) : checkExisting(r, byId.get(r.id)!.orig, byId.get(r.id)!.chore, refs)])),
@@ -411,8 +470,10 @@ function ChoreTableGrid({ family, nav, data }: { family: Family; nav: Nav; data:
 
   const badRows = [...createRows, ...changedRows].filter((r) => !checks.get(r.id)!.payload);
 
-  const save = async () => {
+  /** stay：保存できたら画面に残って表を読み直す。でなければ一覧へ */
+  const save = async (stay: boolean) => {
     setError(null);
+    setNotice(null);
     if (badRows.length) {
       setError(`赤いマスを直してください（${badRows.length}行）`);
       return;
@@ -432,7 +493,17 @@ function ChoreTableGrid({ family, nav, data }: { family: Family; nav: Nav; data:
       });
       setLeaveGuard(null);
       const parts = [res.created && `${res.created}件を追加`, res.updated && `${res.updated}件を変更`, res.deleted && `${res.deleted}件を削除`].filter(Boolean);
-      sessionStorage.setItem("kaji.flash", `${parts.join("・")}しました`);
+      const message = `${parts.join("・")}しました`;
+      if (stay) {
+        await onSavedContinue({
+          notice: message,
+          windowY: scrollY,
+          gridY: document.querySelector(".bulk-grid .dsg-container")?.scrollTop ?? 0,
+          cell: lastCellRef.current,
+        });
+        return;
+      }
+      sessionStorage.setItem("kaji.flash", message);
       nav.go({ name: "chores" });
     } catch (e) {
       if (e instanceof ApiError && e.code === "bulk_invalid" && e.detail?.rows) {
@@ -477,6 +548,11 @@ function ChoreTableGrid({ family, nav, data }: { family: Family; nav: Nav; data:
           よくある家事から選ぶ
         </button>
       </div>
+      {notice && (
+        <p className="notice notice--ok" role="status">
+          {notice}
+        </p>
+      )}
       <SheetCtx.Provider value={ctx}>
         <div className="bulk-grid">
           <DataSheetGrid<EditRow>
@@ -499,7 +575,9 @@ function ChoreTableGrid({ family, nav, data }: { family: Family; nav: Nav; data:
             onActiveCellChange={({ cell }) => {
               // カーソルが最後の行に入ったら、空の行をもう1つ足す
               const cur = rowsRef.current;
-              if (cell && cell.row >= cur.length - 1) sheet.extend([...cur, blankRow()]);
+              if (cell) lastCellRef.current = { rowId: cur[cell.row]?.id ?? "", row: cell.row, col: cell.col };
+              if (restoringRef.current) restoringRef.current = false;
+              else if (cell && cell.row >= cur.length - 1) sheet.extend([...cur, blankRow()]);
             }}
             height={ROW_HEIGHT * Math.min(rows.length + 1, 16) + 2}
             addRowsComponent={false}
@@ -522,8 +600,11 @@ function ChoreTableGrid({ family, nav, data }: { family: Family; nav: Nav; data:
         </p>
       )}
       <div className="form-actions bulk-actions">
-        <button className="btn btn--primary" disabled={busy || !dirty} onClick={() => void save()}>
+        <button className="btn btn--primary" disabled={busy || !dirty} onClick={() => void save(false)}>
           {label}
+        </button>
+        <button className="btn" disabled={busy || !dirty} onClick={() => void save(true)}>
+          保存して編集を続ける
         </button>
         <button className="btn btn--quiet" disabled={!sheet.canUndo} onClick={undo}>
           元に戻す

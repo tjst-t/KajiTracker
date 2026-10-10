@@ -1,6 +1,6 @@
 // 家事を表で編集（PC 幅）を本物のブラウザで通す：列の並び・貼り付け・範囲に同じ値・角を引っぱって埋める・読めない周期の赤・
 // 日付のカレンダー・周期の選ぶ画面・新しい行の追加。登録済みの行の変更と新しい行の追加と削除を1回の保存で。
-// 最後の行に入ると行が増える・「行をまとめて追加」・/chores/bulk は /chores/table へ。スマホ幅では1行ずつ足す画面。
+// 最後の行に入ると行が増える・「行をまとめて追加」・/chores/bulk は /chores/table へ・「保存して編集を続ける」。スマホ幅では1行ずつ足す画面。
 // 開発サーバを起こしてから `npm run e2e`（別のポートなら E2E_ORIGIN=http://localhost:5191 node e2e/bulk-grid-flow.mjs）。
 import { execSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
@@ -359,6 +359,51 @@ try {
   await h1(page, "家事を表で編集");
   if (new URL(page.url()).pathname !== "/chores/table") throw new Error(`URL が ${page.url()}`);
   ok("/chores/bulk を開くと /chores/table に移る");
+
+  // ---- (8) 「保存して編集を続ける」：画面に残って表を読み直し、続けて直して保存できる ----
+  step = "save-continue";
+  await grid.waitFor();
+  const n1 = await rowCount();
+  await cell(n1, "name").click();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("床ふき");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Enter");
+  await popover.waitFor();
+  await page.keyboard.type("7日ごと");
+  await page.keyboard.press("Enter");
+  await popover.waitFor({ state: "detached" });
+  await expectText(n1, "name", "床ふき");
+  await page.getByRole("button", { name: "1件の追加を保存" }).waitFor();
+  await page.getByRole("button", { name: "保存して編集を続ける" }).click();
+  await page.getByRole("status").filter({ hasText: "1件を追加しました" }).waitFor();
+  await h1(page, "家事を表で編集");
+  await page.getByRole("button", { name: "変更はありません" }).waitFor();
+  if (!(await page.getByRole("button", { name: "保存して編集を続ける" }).isDisabled())) throw new Error("変更が無いのに「保存して編集を続ける」が押せる");
+  if ((await rowCount()) !== n1 + 1) throw new Error(`読み直した行の数が ${await rowCount()}（${n1 + 1} のはず）`);
+  let floor = 0;
+  for (let r = 1; r <= n1; r++) if ((await text(r, "name")) === "床ふき") floor = r;
+  if (!floor) throw new Error("保存した「床ふき」が登録済みの行に無い");
+  if (await grid.locator(`[data-gutter="${floor}"]`).evaluate((e) => e.classList.contains("bulk-grid__new"))) throw new Error("保存した行に「新」の印が残る");
+  if (!(await grid.locator(`[data-gutter="${n1 + 1}"]`).evaluate((e) => e.classList.contains("bulk-grid__new")))) throw new Error("最後の空の行が新しい行でない");
+  await page.screenshot({ path: `${SHOTS}/43-table-continued.png` });
+
+  // 続けて担当を変え、もう一度「保存して編集を続ける」。そのあとは確かめ無しで離れられる
+  await cell(floor, "assignee").click();
+  await page.getByRole("dialog", { name: `${floor}行目の担当を選ぶ` }).waitFor();
+  await popover.getByRole("option", { name: "たくみ" }).click();
+  await page.getByRole("button", { name: "1件の変更を保存" }).waitFor();
+  await page.getByRole("button", { name: "保存して編集を続ける" }).click();
+  await page.getByRole("status").filter({ hasText: "1件を変更しました" }).waitFor();
+  await page.getByRole("button", { name: "変更はありません" }).waitFor();
+  await expectText(floor, "assignee", "たくみ");
+  if (await cell(floor, "assignee").evaluate((e) => e.classList.contains("is-changed"))) throw new Error("保存したのに変えた印が残る");
+  lastDialog = "";
+  await page.getByRole("button", { name: "家事", exact: true }).click();
+  await h1(page, "家事");
+  if (lastDialog) throw new Error(`保存したのに離れる確かめが出た: ${lastDialog}`);
+  await page.getByRole("link", { name: "床ふき" }).waitFor();
+  ok("「保存して編集を続ける」で画面に残って「1件を追加しました」、足した行は登録済みになり、続けて担当を変えて保存でき、離れるときの確かめも出ない");
 
   // ---- (7) スマホ幅では1行ずつ足す画面 ----
   step = "phone";
