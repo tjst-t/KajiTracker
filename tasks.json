@@ -567,6 +567,27 @@
       "updatedAt": "2026-10-10T00:24:00.943Z",
       "closedAt": null,
       "extra": {}
+    },
+    {
+      "id": "monthly-rule-multi",
+      "number": 25,
+      "kind": "task",
+      "title": "周期：第何週・曜日の複数選択と、nか月ごと／月を選ぶ",
+      "status": "ready",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "normal",
+      "labels": [],
+      "body": "## 背景\nたくみさんの要望（2026-10-10）。周期の「カレンダーで決まった日」の毎月の決め方を広げる。周期の型と計算は src/shared/schedule.ts（CalendarRule・parseCalendarRule・isOccurrence・evaluate）、説明は src/shared/describe.ts、文字の読み書きは src/shared/schedule-text.ts、入力画面は src/client/components/CalendarFields.tsx（家事の登録フォーム src/client/screens/ChoreForm.tsx と、表の周期の選ぶ画面の両方で使う）。曜日はいまトグルボタン（.weekdays .weekday、丸いボタン）で複数選べる。それと同じ見た目のトグルを使う。\n\n## 決まり\n### 型（CalendarRule）\n- monthly_nth_weekday：nths: (1|2|3|4|5|-1)[]（1つ以上。-1 は最終）と weekdays: number[]（0=日〜6=土、1つ以上）。その月の「第n の w 曜日」のどれかに当たれば予定日（例：第1・第3 の 土・日 → 1か月に最大4日）。\n- monthly_nth_weekday と monthly_day の両方に、月の決め方を2通り：\n  - 間隔：every（1〜24）と anchor（いまどおり。every≥2 のとき anchor の月から数える）。\n  - 月を選ぶ：months: number[]（1〜12、1つ以上）。選んだ月だけが予定のある月。every は 1、anchor は登録日（基準日の選択は要らない）。months があるときは every を見ない。\n- 前の形（monthly_nth_weekday の nth・weekday が1つずつ）も parseCalendarRule で読めて、新しい形（nths・weekdays）に直して返す。保存は新しい形。D1 のマイグレーションは要らない（本番に前の形のデータがある）。\n- weekly はそのまま。monthly_day の day は1つのままでよい。\n\n### 計算\n- isOccurrence を新しい形に合わせる。evaluate（打ち切り・前倒し・遅れ日数）、統計、通知の計画（src/worker/push/plan.ts）がそのまま正しく動くこと。\n- API の検証（src/worker/chores/routes.ts の scheduleColumns：every≥2 のときだけ anchor が要る・anchor が予定日に当たるか）を、months のときは基準日を求めないようにする。\n\n### 説明と文字\n- describeRule の例：「毎月 第1・第3 土・日曜」「毎月 最終金曜」「3か月ごと 第1日曜」「1・4・7・10月 第1土曜」「6・12月 末日」「毎月 15日」。\n- formatScheduleText / parseScheduleText も同じ書き方を読み書きでき、往復で元に戻る。ゆるい書き方も読む（「第1第3土日」「第1,3 土・日」「1,4,7,10月 第1土」「6月12月 末日」など）。\n\n### 入力画面（CalendarFields）\n- 「第何週の何曜日」：第何週を「第1・第2・第3・第4・第5・最終」のトグル（複数）、曜日を「日〜土」のトグル（複数）。いまのセレクトを置き換える。\n- 毎月の2つの決め方（第何週の何曜日・日付）で「月の決め方」を選ぶ：「毎月」「nか月ごと」「月を選ぶ」。\n  - nか月ごと：数字の入力（2〜24）と「最初の予定日」（いまの anchor の入力）。\n  - 月を選ぶ：「1月〜12月」のトグル（複数）。4列×3段など見やすく。\n- 毎週の「何週ごと」はいまのまま。\n- 選んでいないと決められない（曜日・週・月が0個なら「1つ以上選んでください」）。プレビュー（次の期限）が正しく出る。\n- トグルは button（aria-pressed）か checkbox で、キーボードで操作でき、読み上げで分かる名前（「第1」「土」「1月」）。\n\n## 確かめ方\n- src/shared/schedule.test.ts に足す：第1・第3の土・日の予定日の並び、最終と第5が重なる月、months（1・4・7・10月の第1土曜、6・12月の末日）、every=3 との違い、前の形の rule を読めること、evaluate の打ち切り・前倒しが新しい形でも合うこと。schedule-text・describe のテストも足す。API のテスト（月を選ぶときは anchor が要らない）。\n- e2e：家事の登録フォームで「第何週の何曜日」→ 第1・第3、土・日を選んで登録し、詳細の周期の説明が「毎月 第1・第3 土・日曜」になる。表の周期の選ぶ画面で「月を選ぶ」→ 1・4・7・10月を選ぶとマスの文字に反映される。既存の e2e（chores-flow・bulk-grid-flow）が通ること。スクリーンショットで見た目を確かめる。\n- npx tsc -b・npm run build・npm test。ローカルの D1 を消さない。",
+      "doneWhen": "第何週と曜日をトグルで複数選べ、毎月の決め方で nか月ごと（数字）と月を選ぶ（1〜12月のトグル）が使え、計算・説明・文字の読み書き・前の形のデータの読み込みがテストで通り、画面の e2e が通る。tsc・build・test が通る",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-10T00:24:03.460Z",
+      "updatedAt": "2026-10-10T00:24:03.460Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
