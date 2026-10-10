@@ -552,7 +552,7 @@
       "number": 24,
       "kind": "task",
       "title": "表で編集に「保存して編集を続ける」ボタン",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [],
       "milestone": null,
@@ -564,7 +564,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-10T00:24:00.943Z",
-      "updatedAt": "2026-10-10T00:24:00.943Z",
+      "updatedAt": "2026-10-10T00:24:10.699Z",
       "closedAt": null,
       "extra": {}
     },
