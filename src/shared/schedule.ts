@@ -4,13 +4,28 @@ import { type DateStr, type DayNum, daysInMonth, fromDayNum, isDateStr, toDayNum
 
 // ---- 周期の決め方 ----
 
+/** 第何週（-1 は最終） */
+export type Nth = 1 | 2 | 3 | 4 | 5 | -1;
+export const NTHS: readonly Nth[] = [1, 2, 3, 4, 5, -1];
+
+/**
+ * 毎月の規則の月の決め方。
+ * - 間隔：every=3 で3か月ごと（every≥2 のとき anchor の月から数える）
+ * - 月を選ぶ：months（1〜12）。選んだ月だけ。このとき every は 1 で、見ない
+ */
+type MonthPart = { every: number; anchor: DateStr; months?: number[] };
+
 export type CalendarRule =
   /** 毎週（every=2 で隔週）。weekdays は 0=日〜6=土 */
   | { kind: "weekly"; weekdays: number[]; every: number; anchor: DateStr }
-  /** 毎月第n○曜日（nth=-1 で最終○曜日）。every=3 で3か月ごと */
-  | { kind: "monthly_nth_weekday"; nth: 1 | 2 | 3 | 4 | 5 | -1; weekday: number; every: number; anchor: DateStr }
+  /** 毎月の「第n の w 曜日」のどれか（nths の -1 は最終）。例：第1・第3 の 土・日 */
+  | ({ kind: "monthly_nth_weekday"; nths: Nth[]; weekdays: number[] } & MonthPart)
   /** 毎月○日（day=-1 で月末）。その月に無い日は月末に寄せる */
-  | { kind: "monthly_day"; day: number; every: number; anchor: DateStr };
+  | ({ kind: "monthly_day"; day: number } & MonthPart);
+
+/** 第1〜第5、最終の順 */
+export const sortNths = (nths: readonly Nth[]): Nth[] => [...new Set(nths)].sort((a, b) => (a === -1 ? 6 : a) - (b === -1 ? 6 : b));
+const sortNums = (xs: readonly number[]) => [...new Set(xs)].sort((a, b) => a - b);
 
 export type Schedule =
   | { type: "interval"; intervalDays: number; firstDueOn: DateStr }
@@ -27,22 +42,32 @@ export function parseCalendarRule(v: unknown): CalendarRule {
   if (!Number.isInteger(every) || (every as number) < 1 || (every as number) > 24) fail("every は 1〜24");
   if (!isDateStr(o.anchor)) fail("anchor が日付でない");
   const isWeekday = (x: unknown) => Number.isInteger(x) && (x as number) >= 0 && (x as number) <= 6;
+  const weekdaysOf = (wd: unknown): number[] => {
+    if (!Array.isArray(wd) || wd.length === 0 || !wd.every(isWeekday)) fail("weekdays は 0〜6 の配列（1つ以上）");
+    return sortNums(wd as number[]);
+  };
   const base = { every: every as number, anchor: o.anchor as DateStr };
+  /** 毎月の規則の月の決め方。months があれば every は 1 */
+  const monthPart = (): MonthPart => {
+    if (o.months === undefined || o.months === null) return base;
+    const ms = o.months;
+    if (!Array.isArray(ms) || ms.length === 0 || !ms.every((m) => Number.isInteger(m) && m >= 1 && m <= 12)) fail("months は 1〜12 の配列（1つ以上）");
+    return { every: 1, anchor: base.anchor, months: sortNums(ms as number[]) };
+  };
   switch (o.kind) {
-    case "weekly": {
-      const wd = o.weekdays;
-      if (!Array.isArray(wd) || wd.length === 0 || !wd.every(isWeekday)) fail("weekdays は 0〜6 の配列（1つ以上）");
-      return { kind: "weekly", weekdays: [...new Set(wd as number[])].sort(), ...base };
-    }
+    case "weekly":
+      return { kind: "weekly", weekdays: weekdaysOf(o.weekdays), ...base };
     case "monthly_nth_weekday": {
-      if (![1, 2, 3, 4, 5, -1].includes(o.nth as number)) fail("nth は 1〜5 か -1");
-      if (!isWeekday(o.weekday)) fail("weekday は 0〜6");
-      return { kind: "monthly_nth_weekday", nth: o.nth as 1, weekday: o.weekday as number, ...base };
+      // 前の形（nth・weekday が1つずつ）も読む
+      const nths = o.nths ?? (o.nth === undefined ? undefined : [o.nth]);
+      const weekdays = o.weekdays ?? (o.weekday === undefined ? undefined : [o.weekday]);
+      if (!Array.isArray(nths) || nths.length === 0 || !nths.every((n) => (NTHS as unknown[]).includes(n))) fail("nths は 1〜5 か -1 の配列（1つ以上）");
+      return { kind: "monthly_nth_weekday", nths: sortNths(nths as Nth[]), weekdays: weekdaysOf(weekdays), ...monthPart() };
     }
     case "monthly_day": {
       const d = o.day;
       if (!(Number.isInteger(d) && ((d as number) === -1 || ((d as number) >= 1 && (d as number) <= 31)))) fail("day は 1〜31 か -1");
-      return { kind: "monthly_day", day: d as number, ...base };
+      return { kind: "monthly_day", day: d as number, ...monthPart() };
     }
     default:
       return fail(`kind が不明: ${String(o.kind)}`);
@@ -64,16 +89,20 @@ export function isOccurrence(rule: CalendarRule, n: DayNum): boolean {
     }
     case "monthly_nth_weekday":
     case "monthly_day": {
-      const am = ymdOf(a);
-      const months = y * 12 + m - (am.y * 12 + am.m);
-      if (months % rule.every !== 0) return false;
+      if (rule.months) {
+        if (!rule.months.includes(m)) return false;
+      } else {
+        const am = ymdOf(a);
+        const months = y * 12 + m - (am.y * 12 + am.m);
+        if (months % rule.every !== 0) return false;
+      }
       const dim = daysInMonth(y, m);
       if (rule.kind === "monthly_day") {
         const target = rule.day === -1 || rule.day > dim ? dim : rule.day;
         return d === target;
       }
-      if (weekdayOf(n) !== rule.weekday) return false;
-      return rule.nth === -1 ? d + 7 > dim : Math.ceil(d / 7) === rule.nth;
+      if (!rule.weekdays.includes(weekdayOf(n))) return false;
+      return rule.nths.some((nth) => (nth === -1 ? d + 7 > dim : Math.ceil(d / 7) === nth));
     }
   }
 }

@@ -7,7 +7,7 @@ import { type CellProps, type Column, type ContextMenuComponentProps, type Conte
 import { type DateStr, addDays, daysInMonth, toDayNum, weekdayOf } from "../../shared/date";
 import { WEEKDAYS } from "../../shared/describe";
 import { MAX_INTERVAL_DAYS, formatScheduleText, parseDateText, parseScheduleText } from "../../shared/schedule-text";
-import { type CalState, CalendarFields, anchorOfCal, calValid, everyOfCal, initialCal, ruleOfCal } from "./CalendarFields";
+import { type CalState, CalendarFields, anchorOfCal, calError, calValid, everyOfCal, initialCal, ruleOfCal } from "./CalendarFields";
 
 /** 表の1行。id のほかは全部文字 */
 export type SheetRow = { id: string } & Record<string, string>;
@@ -304,7 +304,7 @@ export function SchedulePicker({ text, due, today, onPick }: { text: string; due
       ) : (
         <CalendarFields value={cal} onChange={setCal} today={today} idPrefix="grid-cal" />
       )}
-      <p className="preview">{result ?? (type === "interval" ? `1〜${MAX_INTERVAL_DAYS}日で書いてください` : "曜日を1つ以上選んでください")}</p>
+      <p className="preview">{result ?? (type === "interval" ? `1〜${MAX_INTERVAL_DAYS}日で書いてください` : calError(cal))}</p>
       <div className="form-actions">
         <button type="button" className="btn btn--primary" disabled={!result} onClick={decide}>
           決める

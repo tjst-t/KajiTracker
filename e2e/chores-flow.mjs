@@ -156,6 +156,36 @@ try {
   });
   ok("PC の一覧（表）から編集して保存");
 
+  // ---- 第何週の何曜日：第1・第3 の 土・日（トグルで複数） ----
+  step = "add-nth-weekday";
+  /** トグル（チェックボックス）を labels のものだけ入れる */
+  const toggleOnly = async (scope, all, on) => {
+    for (const name of all) {
+      const box = scope.getByLabel(name, { exact: true });
+      if ((await box.isChecked()) !== on.includes(name)) await box.setChecked(on.includes(name), { force: true });
+    }
+  };
+  await addChore(phone, async () => {
+    await phone.getByLabel("家事の名前").fill("お風呂の大掃除");
+    await phone.getByText("カレンダーで決まった日").click();
+    await phone.getByLabel(/^決め方/).selectOption("monthly_nth_weekday");
+    await toggleOnly(phone, [..."日月火水木金土"], []);
+    await phone.getByText("曜日を1つ以上選んでください").waitFor();
+    if (await phone.getByRole("button", { name: "登録する" }).isEnabled()) throw new Error("曜日が0個なのに登録できる");
+    await toggleOnly(phone, ["第1", "第2", "第3", "第4", "第5", "最終"], ["第1", "第3"]);
+    await toggleOnly(phone, [..."日月火水木金土"], ["土", "日"]);
+    await phone.getByText("毎月 第1・第3 土・日曜。次の期限は").waitFor();
+    await phone.getByLabel("月の決め方").selectOption("months");
+    await phone.getByText("月を1つ以上選んでください").waitFor();
+    await phone.screenshot({ path: `${SHOTS}/15b-form-months.png`, fullPage: true });
+    await phone.getByLabel("月の決め方").selectOption("monthly");
+    await phone.screenshot({ path: `${SHOTS}/15a-form-nth-weekday.png`, fullPage: true });
+  });
+  await h1(phone, "お風呂の大掃除");
+  await phone.getByText("毎月 第1・第3 土・日曜").first().waitFor();
+  await phone.screenshot({ path: `${SHOTS}/15c-detail-nth-weekday.png`, fullPage: true });
+  ok("第何週の何曜日：第1・第3、土・日をトグルで選んで登録すると、詳細に「毎月 第1・第3 土・日曜」");
+
   // ---- まとめて登録：よくある家事から選ぶ＋手で1行（曜日で）＋不備の行 ----
   step = "bulk";
   // PC 幅は「家事を表で編集」の表（bulk-grid-flow で確かめる）。ここではスマホ幅の1行ずつの画面を、登録フォームのリンクから通す
@@ -179,7 +209,7 @@ try {
   await pcPage.getByLabel(`${n}行目のグループ`).selectOption({ label: "掃除" });
   await pcPage.getByRole("button", { name: `${n}行目を曜日・日付で決める` }).click();
   const dlg = pcPage.getByRole("dialog");
-  await dlg.getByLabel("決め方").selectOption("monthly_day");
+  await dlg.getByLabel(/^決め方/).selectOption("monthly_day");
   await dlg.locator("label.field", { hasText: /^日付/ }).locator("select").selectOption("1");
   await dlg.getByRole("button", { name: "決める" }).click();
   await pcPage.getByRole("button", { name: `${n}行目の周期を変える` }).getByText("毎月 1日").waitFor();

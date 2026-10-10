@@ -187,12 +187,32 @@ try {
   await expectText(1, "due", new RegExp(`^${md(target)}（`));
   ok(`期限のマスを押し、カレンダーから ${md(target)} を選ぶ`);
 
-  // ---- 周期のマスを押して小さな画面から「毎週 月・木」を選ぶ ----
-  step = "schedule-pick";
+  // ---- 周期の小さな画面で「月を選ぶ」：1・4・7・10月の第1土曜 ----
+  step = "schedule-months";
   await cell(3, "schedule").click();
   const dlg = page.getByRole("dialog", { name: "3行目の周期を選ぶ" });
   await dlg.waitFor();
   await dlg.getByText("カレンダーで決まった日").click();
+  await dlg.getByLabel(/^決め方/).selectOption("monthly_nth_weekday");
+  for (const w of "日月火水木金土") {
+    const box = dlg.getByLabel(w, { exact: true });
+    if ((await box.isChecked()) !== (w === "土")) await box.setChecked(w === "土", { force: true });
+  }
+  await dlg.getByLabel("月の決め方").selectOption("months");
+  for (const m of [1, 4, 7, 10]) await dlg.getByLabel(`${m}月`, { exact: true }).setChecked(true, { force: true });
+  await dlg.getByText("1・4・7・10月 第1土曜", { exact: true }).waitFor();
+  await page.screenshot({ path: `${SHOTS}/34a-grid-schedule-months.png` });
+  await dlg.getByRole("button", { name: "決める" }).click();
+  await popover.waitFor({ state: "detached" });
+  await expectText(3, "schedule", "1・4・7・10月 第1土曜");
+  await expectText(3, "due", /^次は /);
+  ok("周期の小さな画面で「月を選ぶ」→ 1・4・7・10月を選ぶと、マスに「1・4・7・10月 第1土曜」");
+
+  // ---- 周期のマスを押して小さな画面から「毎週 月・木」を選ぶ ----
+  step = "schedule-pick";
+  await cell(3, "schedule").click();
+  await dlg.waitFor();
+  await dlg.getByLabel(/^決め方/).selectOption("weekly");
   for (const w of "日月火水木金土") {
     const box = dlg.getByLabel(w, { exact: true });
     if ((await box.isChecked()) !== "月木".includes(w)) await box.setChecked("月木".includes(w), { force: true });

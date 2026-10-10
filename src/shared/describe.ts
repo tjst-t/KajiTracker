@@ -6,21 +6,36 @@ export const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"] as con
 
 const nthText = (nth: number) => (nth === -1 ? "最終" : `第${nth}`);
 
+/** 曜日を月曜から並べて「月・木」「土・日」にする（日曜は最後） */
+const weekdaysText = (days: number[]) =>
+  [...days]
+    .sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
+    .map((d) => WEEKDAYS[d])
+    .join("・");
+
 function everyWeeks(n: number) {
   return n === 1 ? "毎週" : n === 2 ? "隔週" : `${n}週ごと`;
 }
-function everyMonths(n: number) {
-  return n === 1 ? "毎月" : `${n}か月ごと`;
+/** 「毎月」「3か月ごと」「1・4・7・10月」 */
+function monthsText(r: { every: number; months?: number[] }) {
+  if (r.months) return `${r.months.join("・")}月`;
+  return r.every === 1 ? "毎月" : `${r.every}か月ごと`;
+}
+
+/** 「第1日曜」「第1・第3 土・日曜」 */
+function nthWeekdaysText(nths: number[], weekdays: number[]) {
+  const sep = nths.length === 1 && weekdays.length === 1 ? "" : " ";
+  return `${nths.map(nthText).join("・")}${sep}${weekdaysText(weekdays)}曜`;
 }
 
 export function describeRule(r: CalendarRule): string {
   switch (r.kind) {
     case "weekly":
-      return `${everyWeeks(r.every)} ${r.weekdays.map((d) => WEEKDAYS[d]).join("・")}曜`;
+      return `${everyWeeks(r.every)} ${weekdaysText(r.weekdays)}曜`;
     case "monthly_nth_weekday":
-      return `${everyMonths(r.every)} ${nthText(r.nth)}${WEEKDAYS[r.weekday]}曜`;
+      return `${monthsText(r)} ${nthWeekdaysText(r.nths, r.weekdays)}`;
     case "monthly_day":
-      return `${everyMonths(r.every)} ${r.day === -1 ? "末日" : `${r.day}日`}`;
+      return `${monthsText(r)} ${r.day === -1 ? "末日" : `${r.day}日`}`;
   }
 }
 

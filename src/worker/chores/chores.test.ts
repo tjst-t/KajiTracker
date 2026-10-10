@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { addDays, todayInTokyo, toDayNum, weekdayOf } from "../../shared/date";
 import { TestDevice, bootstrapUser } from "../../../test/client";
@@ -58,6 +59,45 @@ describe("家事の登録", () => {
     });
     expect(ok.status).toBe(201);
     expect(ok.json).toMatchObject({ dueOn: addDays(today(), 7), status: "upcoming" });
+  });
+
+  it("月を選ぶときは最初の予定日が要らない（every を送っても見ない）", async () => {
+    const { takumi, fam } = await family();
+    const r = await takumi.post(`/api/families/${fam.id}/chores`, {
+      name: "エアコンのフィルター",
+      schedule: { type: "calendar", rule: { kind: "monthly_nth_weekday", nths: [1], weekdays: [6], every: 3, months: [10, 1, 7, 4] } },
+    });
+    expect(r.status).toBe(201);
+    expect(r.json.schedule.rule).toEqual({ kind: "monthly_nth_weekday", nths: [1], weekdays: [6], every: 1, anchor: today(), months: [1, 4, 7, 10] });
+    const day = await takumi.post(`/api/families/${fam.id}/chores`, {
+      name: "網戸",
+      schedule: { type: "calendar", rule: { kind: "monthly_day", day: -1, months: [6, 12] } },
+    });
+    expect(day.status).toBe(201);
+    expect(day.json.schedule.rule).toMatchObject({ every: 1, anchor: today(), months: [6, 12] });
+    const empty = await takumi.post(`/api/families/${fam.id}/chores`, { name: "x", schedule: { type: "calendar", rule: { kind: "monthly_day", day: 1, months: [] } } });
+    expect(empty.status).toBe(400);
+  });
+
+  it("第何週・曜日を複数：第1・第3 の 土・日", async () => {
+    const { takumi, fam } = await family();
+    const r = await takumi.post(`/api/families/${fam.id}/chores`, {
+      name: "お風呂の大掃除",
+      schedule: { type: "calendar", rule: { kind: "monthly_nth_weekday", nths: [3, 1], weekdays: [6, 0] } },
+    });
+    expect(r.status).toBe(201);
+    expect(r.json.schedule.rule).toMatchObject({ nths: [1, 3], weekdays: [0, 6], every: 1 });
+  });
+
+  it("前の形（nth・weekday）で保存した家事も読める", async () => {
+    const { takumi, fam } = await family();
+    const c = (await takumi.post(`/api/families/${fam.id}/chores`, { name: "排水口", schedule: interval(7, today()) })).json;
+    await env.DB.prepare("UPDATE chores SET schedule_type = 'calendar', interval_days = NULL, first_due_on = NULL, calendar_rule = ? WHERE id = ?")
+      .bind(JSON.stringify({ kind: "monthly_nth_weekday", nth: -1, weekday: 5, every: 1, anchor: "2026-01-01" }), c.id)
+      .run();
+    const got = (await takumi.get(`/api/chores/${c.id}`)).json;
+    expect(got.schedule.rule).toEqual({ kind: "monthly_nth_weekday", nths: [-1], weekdays: [5], every: 1, anchor: "2026-01-01" });
+    expect(got.dueOn).not.toBeNull();
   });
 
   it("おかしな入力は断る", async () => {

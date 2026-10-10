@@ -54,22 +54,22 @@ describe("カレンダーの予定日", () => {
   });
 
   it("毎月第1日曜", () => {
-    const r: CalendarRule = { kind: "monthly_nth_weekday", nth: 1, weekday: 0, every: 1, anchor: "2026-10-01" };
+    const r: CalendarRule = { kind: "monthly_nth_weekday", nths: [1], weekdays: [0], every: 1, anchor: "2026-10-01" };
     expect(occurrences(r, "2026-10-01", "2027-01-31")).toEqual(["2026-10-04", "2026-11-01", "2026-12-06", "2027-01-03"]);
   });
 
   it("毎月第5日曜：無い月は飛ばす", () => {
-    const r: CalendarRule = { kind: "monthly_nth_weekday", nth: 5, weekday: 0, every: 1, anchor: "2026-10-01" };
+    const r: CalendarRule = { kind: "monthly_nth_weekday", nths: [5], weekdays: [0], every: 1, anchor: "2026-10-01" };
     expect(occurrences(r, "2026-10-01", "2027-01-31")).toEqual(["2026-11-29", "2027-01-31"]);
   });
 
   it("毎月最終日曜", () => {
-    const r: CalendarRule = { kind: "monthly_nth_weekday", nth: -1, weekday: 0, every: 1, anchor: "2026-10-01" };
+    const r: CalendarRule = { kind: "monthly_nth_weekday", nths: [-1], weekdays: [0], every: 1, anchor: "2026-10-01" };
     expect(occurrences(r, "2026-10-01", "2026-12-31")).toEqual(["2026-10-25", "2026-11-29", "2026-12-27"]);
   });
 
   it("3か月ごとの第1日曜", () => {
-    const r: CalendarRule = { kind: "monthly_nth_weekday", nth: 1, weekday: 0, every: 3, anchor: "2026-10-01" };
+    const r: CalendarRule = { kind: "monthly_nth_weekday", nths: [1], weekdays: [0], every: 3, anchor: "2026-10-01" };
     expect(occurrences(r, "2026-10-01", "2027-04-30")).toEqual(["2026-10-04", "2027-01-03", "2027-04-04"]);
   });
 
@@ -97,6 +97,49 @@ describe("カレンダーの予定日", () => {
   it("隔週：anchor を木曜にすると、その週の日曜（過去）が数え始めになるので、最初は2週後", () => {
     const r: CalendarRule = { kind: "weekly", weekdays: [0], every: 2, anchor: "2026-10-01" };
     expect(occurrences(r, "2026-10-01", "2026-10-31")).toEqual(["2026-10-11", "2026-10-25"]);
+  });
+
+  it("毎月 第1・第3 の 土・日（1か月に4日）", () => {
+    const r: CalendarRule = { kind: "monthly_nth_weekday", nths: [1, 3], weekdays: [0, 6], every: 1, anchor: "2026-10-01" };
+    // 10月：第1土 3・第1日 4・第3土 17・第3日 18。11月：第1日 1・第1土 7・第3日 15・第3土 21
+    expect(occurrences(r, "2026-10-01", "2026-11-30")).toEqual([
+      "2026-10-03",
+      "2026-10-04",
+      "2026-10-17",
+      "2026-10-18",
+      "2026-11-01",
+      "2026-11-07",
+      "2026-11-15",
+      "2026-11-21",
+    ]);
+  });
+
+  it("第5と最終が重なる月は1日だけ", () => {
+    const r: CalendarRule = { kind: "monthly_nth_weekday", nths: [5, -1], weekdays: [0], every: 1, anchor: "2026-10-01" };
+    // 10月は第5日曜が無く最終は 25。11月は 29 が第5で最終。12月は最終 27。1月は 31 が第5で最終
+    expect(occurrences(r, "2026-10-01", "2027-01-31")).toEqual(["2026-10-25", "2026-11-29", "2026-12-27", "2027-01-31"]);
+  });
+
+  it("月を選ぶ：1・4・7・10月の第1土曜", () => {
+    const r: CalendarRule = { kind: "monthly_nth_weekday", nths: [1], weekdays: [6], every: 1, anchor: "2026-10-01", months: [1, 4, 7, 10] };
+    expect(occurrences(r, "2026-10-01", "2027-10-31")).toEqual(["2026-10-03", "2027-01-02", "2027-04-03", "2027-07-03", "2027-10-02"]);
+  });
+
+  it("月を選ぶ：6・12月の末日", () => {
+    const r: CalendarRule = { kind: "monthly_day", day: -1, every: 1, anchor: "2026-10-01", months: [6, 12] };
+    expect(occurrences(r, "2026-10-01", "2027-12-31")).toEqual(["2026-12-31", "2027-06-30", "2027-12-31"]);
+  });
+
+  it("月を選ぶと3か月ごとの違い：3か月ごとは anchor の月から、月を選ぶは anchor によらない", () => {
+    const every3: CalendarRule = { kind: "monthly_day", day: 1, every: 3, anchor: "2026-11-01" };
+    const months: CalendarRule = { kind: "monthly_day", day: 1, every: 1, anchor: "2026-11-01", months: [1, 4, 7, 10] };
+    expect(occurrences(every3, "2026-11-01", "2027-10-31")).toEqual(["2026-11-01", "2027-02-01", "2027-05-01", "2027-08-01"]);
+    expect(occurrences(months, "2026-11-01", "2027-10-31")).toEqual(["2027-01-01", "2027-04-01", "2027-07-01", "2027-10-01"]);
+  });
+
+  it("月を選ぶ：months があれば every を見ない", () => {
+    const r = { kind: "monthly_day", day: 1, every: 5, anchor: "2026-10-01", months: [11, 12] } as CalendarRule;
+    expect(occurrences(r, "2026-10-01", "2026-12-31")).toEqual(["2026-11-01", "2026-12-01"]);
   });
 
   it("anchor より前には予定日を作らない", () => {
@@ -203,10 +246,39 @@ describe("カレンダーで固定（calendar）", () => {
   });
 
   it("毎月第1日曜：遅れても次の月の予定日で打ち切り", () => {
-    const s = cal({ kind: "monthly_nth_weekday", nth: 1, weekday: 0, every: 1, anchor: "2026-10-01" });
+    const s = cal({ kind: "monthly_nth_weekday", nths: [1], weekdays: [0], every: 1, anchor: "2026-10-01" });
     expect(evaluate(s, [], "2026-10-20")).toMatchObject({ dueOn: "2026-10-04", status: "overdue", daysLate: 16 });
     expect(evaluate(s, [], "2026-11-02")).toMatchObject({ dueOn: "2026-11-01", status: "overdue", daysLate: 1 });
     expect(evaluate(s, ["2026-10-20"], "2026-10-21")).toMatchObject({ dueOn: "2026-11-01", status: "upcoming" });
+  });
+
+  it("第1・第3 の 土・日：次の予定日で打ち切り、前倒しは次の1回分", () => {
+    const s = cal({ kind: "monthly_nth_weekday", nths: [1, 3], weekdays: [0, 6], every: 1, anchor: "2026-10-01" });
+    // 予定日は 10/3(土) 10/4(日) 10/17(土) 10/18(日) 11/1(日) …
+    const e1 = evaluate(s, [], "2026-10-05");
+    expect(e1).toMatchObject({ dueOn: "2026-10-04", status: "overdue", daysLate: 1 });
+    expect(e1.cycles).toEqual([{ dueOn: "2026-10-03", doneOn: null, daysLate: null, missed: true }]);
+    // 3日・4日に済ませ、16日にもやった → 17日の分の前倒し。次は18日
+    const e2 = evaluate(s, ["2026-10-03", "2026-10-04", "2026-10-16"], "2026-10-16");
+    expect(e2).toMatchObject({ dueOn: "2026-10-18", status: "upcoming" });
+    expect(e2.cycles.map((c) => [c.dueOn, c.doneOn, c.daysLate])).toEqual([
+      ["2026-10-03", "2026-10-03", 0],
+      ["2026-10-04", "2026-10-04", 0],
+      ["2026-10-17", "2026-10-16", 0],
+    ]);
+    // 4日の回を 10日に遅れてやった
+    expect(evaluate(s, ["2026-10-03", "2026-10-10"], "2026-10-11").cycles[1]).toMatchObject({ dueOn: "2026-10-04", daysLate: 6 });
+  });
+
+  it("月を選ぶ（6・12月の末日）：次の予定日まで遅れ、来たら打ち切り", () => {
+    const s = cal({ kind: "monthly_day", day: -1, every: 1, anchor: "2026-10-01", months: [6, 12] });
+    expect(evaluate(s, [], "2026-10-10")).toMatchObject({ dueOn: "2026-12-31", status: "upcoming" });
+    expect(evaluate(s, [], "2027-01-05")).toMatchObject({ dueOn: "2026-12-31", status: "overdue", daysLate: 5 });
+    const e = evaluate(s, [], "2027-06-30");
+    expect(e).toMatchObject({ dueOn: "2027-06-30", status: "today" });
+    expect(e.cycles).toEqual([{ dueOn: "2026-12-31", doneOn: null, daysLate: null, missed: true }]);
+    // 12月の前に済ませたら12月の分の前倒し。次は6月
+    expect(evaluate(s, ["2026-11-20"], "2026-11-20")).toMatchObject({ dueOn: "2027-06-30", status: "upcoming" });
   });
 
   it("毎月31日：短い月は月末が期限", () => {
@@ -240,13 +312,47 @@ describe("parseCalendarRule", () => {
     });
   });
 
+  it("前の形（nth・weekday が1つずつ）を新しい形に直す", () => {
+    expect(parseCalendarRule({ kind: "monthly_nth_weekday", nth: -1, weekday: 5, every: 3, anchor: "2026-10-01" })).toEqual({
+      kind: "monthly_nth_weekday",
+      nths: [-1],
+      weekdays: [5],
+      every: 3,
+      anchor: "2026-10-01",
+    });
+  });
+
+  it("第何週は 第1〜第5・最終の順、曜日・月は小さい順にそろえる", () => {
+    expect(parseCalendarRule({ kind: "monthly_nth_weekday", nths: [-1, 3, 1, 3], weekdays: [6, 0], anchor: "2026-10-01" })).toEqual({
+      kind: "monthly_nth_weekday",
+      nths: [1, 3, -1],
+      weekdays: [0, 6],
+      every: 1,
+      anchor: "2026-10-01",
+    });
+  });
+
+  it("months があれば every は 1 にする", () => {
+    expect(parseCalendarRule({ kind: "monthly_day", day: -1, every: 3, months: [12, 6, 6], anchor: "2026-10-01" })).toEqual({
+      kind: "monthly_day",
+      day: -1,
+      every: 1,
+      anchor: "2026-10-01",
+      months: [6, 12],
+    });
+  });
+
   it("おかしな規則は断る", () => {
     expect(() => parseCalendarRule({ kind: "weekly", weekdays: [], anchor: "2026-10-01" })).toThrow();
     expect(() => parseCalendarRule({ kind: "weekly", weekdays: [7], anchor: "2026-10-01" })).toThrow();
-    expect(() => parseCalendarRule({ kind: "monthly_nth_weekday", nth: 6, weekday: 0, anchor: "2026-10-01" })).toThrow();
+    expect(() => parseCalendarRule({ kind: "monthly_nth_weekday", nths: [6], weekdays: [0], anchor: "2026-10-01" })).toThrow();
     expect(() => parseCalendarRule({ kind: "monthly_day", day: 0, anchor: "2026-10-01" })).toThrow();
     expect(() => parseCalendarRule({ kind: "monthly_day", day: 1, every: 0, anchor: "2026-10-01" })).toThrow();
     expect(() => parseCalendarRule({ kind: "monthly_day", day: 1, anchor: "2026/10/01" })).toThrow();
+    expect(() => parseCalendarRule({ kind: "monthly_nth_weekday", nths: [], weekdays: [0], anchor: "2026-10-01" })).toThrow();
+    expect(() => parseCalendarRule({ kind: "monthly_nth_weekday", nths: [1], weekdays: [], anchor: "2026-10-01" })).toThrow();
+    expect(() => parseCalendarRule({ kind: "monthly_day", day: 1, months: [], anchor: "2026-10-01" })).toThrow();
+    expect(() => parseCalendarRule({ kind: "monthly_day", day: 1, months: [13], anchor: "2026-10-01" })).toThrow();
     expect(() => parseCalendarRule({ kind: "yearly" })).toThrow();
   });
 });

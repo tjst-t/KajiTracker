@@ -4,7 +4,7 @@ import { describeRule, shortDate } from "../../shared/describe";
 import { type Schedule, evaluate } from "../../shared/schedule";
 import { type Family, type Group, type Member, api } from "../api";
 import type { ChoreDetail, ChoreView } from "../chores";
-import { type CalState, CalendarFields, anchorOfCal, calValid, initialCal, ruleForApi, ruleOfCal } from "../components/CalendarFields";
+import { type CalState, CalendarFields, anchorOfCal, calError, calValid, initialCal, ruleForApi, ruleOfCal } from "../components/CalendarFields";
 import { errorText } from "../format";
 import type { Nav } from "../router";
 
@@ -185,7 +185,7 @@ export function ChoreForm({ family, nav, editId }: { family: Family; nav: Nav; e
               {preview.status === "overdue" && <>（もう {preview.daysLate}日 過ぎています）</>}
             </>
           ) : !calValid(form.cal) && form.type === "calendar" ? (
-            "曜日を1つ以上選んでください"
+            calError(form.cal)
           ) : (
             "この決め方では、予定日が見つかりません"
           )}

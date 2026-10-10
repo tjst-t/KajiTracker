@@ -5,7 +5,7 @@ import { evaluate } from "../../shared/schedule";
 import type { ChoreTemplate } from "../../shared/templates";
 import { ApiError, type Family, type Group, type Member, api } from "../api";
 import type { ChoreView } from "../chores";
-import { type CalState, CalendarFields, anchorOfCal, calValid, initialCal, ruleForApi, ruleOfCal } from "../components/CalendarFields";
+import { type CalState, CalendarFields, anchorOfCal, calError, calValid, initialCal, ruleForApi, ruleOfCal } from "../components/CalendarFields";
 import { TemplateDialog, useModal } from "../components/TemplateDialog";
 import { errorText } from "../format";
 import type { Nav } from "../router";
@@ -199,7 +199,7 @@ function ChoreBulkRows({ family, nav, data: { groups, members, existing } }: { f
                       ) : (
                         <div className="cycle-cell">
                           <button type="button" className="btn btn--small cycle-rule" onClick={() => setEditingCal(r.key)} aria-label={`${label}の周期を変える`}>
-                            {calValid(r.cal) ? describeRule(ruleOfCal(r.cal, today)) : "曜日を選ぶ"}
+                            {calValid(r.cal) ? describeRule(ruleOfCal(r.cal, today)) : "周期を選ぶ"}
                           </button>
                           <button type="button" className="btn btn--quiet btn--small" onClick={() => update(r.key, { type: "interval" })}>
                             日数にする
@@ -283,7 +283,7 @@ function CalendarDialog({ initial, today, onSave, onCancel }: { initial: CalStat
     <dialog ref={ref} className="dialog" onClose={onCancel} aria-labelledby="cal-dialog-title">
       <h2 id="cal-dialog-title">曜日・日付で決める</h2>
       <CalendarFields value={cal} onChange={setCal} today={today} idPrefix="bulk-cal" />
-      <p className="preview">{calValid(cal) ? describeRule(ruleOfCal(cal, today)) : "曜日を1つ以上選んでください"}</p>
+      <p className="preview">{calError(cal) ?? describeRule(ruleOfCal(cal, today))}</p>
       <div className="form-actions">
         <button className="btn btn--primary" disabled={!calValid(cal)} onClick={() => onSave(cal)}>
           決める

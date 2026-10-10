@@ -118,13 +118,16 @@ PK は (key, window_start)。
 ```jsonc
 // 毎週（every=2 で隔週）。weekdays は 0=日〜6=土
 { "kind": "weekly", "weekdays": [0], "every": 1, "anchor": "2026-10-04" }
-// 毎月第n○曜日（nth=-1 で最終○曜日）。every=3 で3か月ごと
-{ "kind": "monthly_nth_weekday", "nth": 1, "weekday": 0, "every": 1, "anchor": "2026-10-04" }
+// 毎月の「第n の w 曜日」のどれか（nths の -1 は最終）。例：第1・第3 の 土・日。every=3 で3か月ごと
+{ "kind": "monthly_nth_weekday", "nths": [1, 3], "weekdays": [0, 6], "every": 1, "anchor": "2026-10-04" }
 // 毎月○日（day=-1 で月末）。その月に無い日（31日など）は月末に寄せる
 { "kind": "monthly_day", "day": 1, "every": 1, "anchor": "2026-10-04" }
+// 毎月の2つは、月を選ぶこともできる（months は 1〜12）。このとき every は 1 で見ない。例：1・4・7・10月の第1土曜
+{ "kind": "monthly_nth_weekday", "nths": [1], "weekdays": [6], "every": 1, "anchor": "2026-10-04", "months": [1, 4, 7, 10] }
 ```
+前の形（`monthly_nth_weekday` の `nth`・`weekday` が1つずつ）も `parseCalendarRule` で読み、新しい形に直す（保存は新しい形。D1 の書き換えはしない）。
 `anchor` は予定日を数え始める日。anchor より前には予定日を作らない（登録したとたんに「遅れ」が出ないように）。
-- 毎週・毎月（every=1）は、登録した日を anchor にする。
+- 毎週・毎月（every=1）と月を選ぶ（months）は、登録した日を anchor にする。
 - 隔週・nか月ごと（every≥2）は、登録画面で「最初の予定日」を選んでもらい、それを anchor にする。週・月の数え始めは anchor の週（日曜始まり）・月なので、登録した日を anchor にすると「その週の過ぎた日曜」が数え始めになり、最初の予定日が思ったより1回分先になることがあるため。
 
 **chore_groups**（家事のグループ）

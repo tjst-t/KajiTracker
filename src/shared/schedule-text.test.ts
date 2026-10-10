@@ -9,7 +9,7 @@ const parse = (t: string) => parseScheduleText(t, TODAY);
 const iv = (intervalDays: number): ParsedScheduleText => ({ ok: true, kind: "interval", intervalDays });
 const weekly = (weekdays: number[], every = 1) => ({ ok: true, kind: "calendar", rule: { kind: "weekly", weekdays, every }, needsAnchor: every >= 2 });
 const mday = (day: number, every = 1) => ({ ok: true, kind: "calendar", rule: { kind: "monthly_day", day, every }, needsAnchor: every >= 2 });
-const mnth = (nth: number, weekday: number, every = 1) => ({ ok: true, kind: "calendar", rule: { kind: "monthly_nth_weekday", nth, weekday, every }, needsAnchor: every >= 2 });
+const mnth = (nth: number, weekday: number, every = 1) => ({ ok: true, kind: "calendar", rule: { kind: "monthly_nth_weekday", nths: [nth], weekdays: [weekday], every }, needsAnchor: every >= 2 });
 
 /** 読めて、期待どおりになる（suggestedAnchor は別に確かめる） */
 function expectParsed(texts: string[], expected: object) {
@@ -91,6 +91,20 @@ describe("毎月の周期を読む", () => {
     expectParsed(["6か月ごと 10日"], mday(10, 6));
     expectParsed(["1か月ごと 5日"], mday(5, 1));
   });
+  it("第何週・曜日を複数（第1・第3 土・日）", () => {
+    const r = { ok: true, kind: "calendar", rule: { kind: "monthly_nth_weekday", nths: [1, 3], weekdays: [0, 6], every: 1 }, needsAnchor: false };
+    expectParsed(["毎月 第1・第3 土・日曜", "第1第3土日", "第1,3 土・日", "第1、第3 土日曜日", "毎月第3・第1 日・土", "第1と第3の土日"], r);
+    expectParsed(["第1・最終 金", "最終・第1金曜"], { rule: { kind: "monthly_nth_weekday", nths: [1, -1], weekdays: [5], every: 1 } });
+    expectParsed(["第2 月・水・金"], { rule: { kind: "monthly_nth_weekday", nths: [2], weekdays: [1, 3, 5], every: 1 } });
+  });
+  it("月を選ぶ（1・4・7・10月、6月12月）は基準日が要らない", () => {
+    const q = { ok: true, kind: "calendar", rule: { kind: "monthly_nth_weekday", nths: [1], weekdays: [6], every: 1, months: [1, 4, 7, 10] }, needsAnchor: false };
+    expectParsed(["1・4・7・10月 第1土曜", "1,4,7,10月 第1土", "１、４、７、１０月第1土", "1月4月7月10月 第1土曜日", "10・1・7・4月 第1土"], q);
+    const e = { ok: true, kind: "calendar", rule: { kind: "monthly_day", day: -1, every: 1, months: [6, 12] }, needsAnchor: false };
+    expectParsed(["6・12月 末日", "6月12月 末日", "6,12月 月末", "6月・12月 末日"], e);
+    expectParsed(["3月 15日"], { rule: { kind: "monthly_day", day: 15, every: 1, months: [3] } });
+    expect(parse("6・12月 末日")).not.toHaveProperty("suggestedAnchor");
+  });
   it("数か月ごとの基準日の候補", () => {
     expect(parse("3か月ごと 1日")).toMatchObject({ needsAnchor: true, suggestedAnchor: "2026-11-01" });
     expect(parse("2か月ごと 第2木曜")).toMatchObject({ needsAnchor: true, suggestedAnchor: "2026-10-08" });
@@ -124,10 +138,15 @@ describe("読めない書き方", () => {
     bad("毎月0日", "1〜31");
     bad("第6火曜", "第1〜第5");
     bad("第0火曜", "第1〜第5");
+    bad("第1・第6 土", "第1〜第5");
+    bad("13月 1日", "1〜12月");
+    bad("0・6月 末日", "1〜12月");
   });
   it("毎月だけ・日にちが読めない", () => {
     bad("毎月", "何日か");
     bad("3か月ごと", "何日か");
+    bad("6・12月", "何日か");
+    bad("第1・第3 ほげ", "周期として読めません");
     bad("毎月 ほげ", "日にちが読めません");
   });
   it("曜日が読めない", () => {
@@ -152,13 +171,19 @@ describe("書いて読むと元に戻る", () => {
     { kind: "weekly", weekdays: [6], every: 2, anchor: A },
     { kind: "weekly", weekdays: [2, 5], every: 3, anchor: A },
     { kind: "weekly", weekdays: [3], every: 24, anchor: A },
-    { kind: "monthly_nth_weekday", nth: 1, weekday: 0, every: 1, anchor: A },
-    { kind: "monthly_nth_weekday", nth: 5, weekday: 6, every: 1, anchor: A },
-    { kind: "monthly_nth_weekday", nth: -1, weekday: 5, every: 3, anchor: A },
+    { kind: "monthly_nth_weekday", nths: [1], weekdays: [0], every: 1, anchor: A },
+    { kind: "monthly_nth_weekday", nths: [5], weekdays: [6], every: 1, anchor: A },
+    { kind: "monthly_nth_weekday", nths: [-1], weekdays: [5], every: 3, anchor: A },
     { kind: "monthly_day", day: 1, every: 1, anchor: A },
     { kind: "monthly_day", day: 31, every: 1, anchor: A },
     { kind: "monthly_day", day: -1, every: 1, anchor: A },
     { kind: "monthly_day", day: 15, every: 12, anchor: A },
+    { kind: "monthly_nth_weekday", nths: [1, 3], weekdays: [0, 6], every: 1, anchor: A },
+    { kind: "monthly_nth_weekday", nths: [2, -1], weekdays: [3], every: 2, anchor: A },
+    { kind: "monthly_nth_weekday", nths: [1], weekdays: [6], every: 1, anchor: A, months: [1, 4, 7, 10] },
+    { kind: "monthly_nth_weekday", nths: [1, 2, 3, 4, 5, -1], weekdays: [0, 1, 2, 3, 4, 5, 6], every: 1, anchor: A, months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+    { kind: "monthly_day", day: -1, every: 1, anchor: A, months: [6, 12] },
+    { kind: "monthly_day", day: 1, every: 1, anchor: A, months: [3] },
   ];
   const schedules: Schedule[] = [
     ...[1, 2, 7, 14, 21, 30, 365, 3660].map((n): Schedule => ({ type: "interval", intervalDays: n, firstDueOn: A })),
@@ -173,6 +198,9 @@ describe("書いて読むと元に戻る", () => {
     expect(formatScheduleText({ type: "calendar", rule: rules[8]! })).toBe("3か月ごと 最終金曜");
     expect(formatScheduleText({ type: "calendar", rule: rules[9]! })).toBe("毎月 1日");
     expect(formatScheduleText({ type: "calendar", rule: rules[11]! })).toBe("毎月 末日");
+    expect(formatScheduleText({ type: "calendar", rule: rules[13]! })).toBe("毎月 第1・第3 土・日曜");
+    expect(formatScheduleText({ type: "calendar", rule: rules[15]! })).toBe("1・4・7・10月 第1土曜");
+    expect(formatScheduleText({ type: "calendar", rule: rules[17]! })).toBe("6・12月 末日");
   });
 
   it.each(schedules.map((s) => [formatScheduleText(s), s] as const))("%s", (text, s) => {

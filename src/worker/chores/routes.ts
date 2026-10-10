@@ -32,7 +32,8 @@ function scheduleColumns(input: unknown, today: DateStr, previous?: ChoreRow) {
   }
   if (s?.type === "calendar") {
     const raw = { ...(s.rule ?? {}) };
-    const every = (raw.every as number | undefined) ?? 1;
+    // 月を選ぶ（months）ときは every を見ない（基準日も要らない）
+    const every = Array.isArray(raw.months) ? 1 : ((raw.every as number | undefined) ?? 1);
     if (raw.anchor === undefined || raw.anchor === null || raw.anchor === "") {
       if (every >= 2) fail(400, "隔週・数か月ごとのときは、最初の予定日を選んでください", "anchor_required");
       // 毎週・毎月は登録した日から数える。編集では前の基準日を引き継ぐ

@@ -1,9 +1,9 @@
 // 周期を1つのマスの文字で書く・読む（家事を表で編集で使う）。副作用は持たない。
-// 書き方は describeSchedule と同じ（「7日ごと」「毎週 月・木曜」「隔週 土曜」「毎月 第1日曜」「3か月ごと 最終金曜」「毎月 末日」）。
+// 書き方は describeSchedule と同じ（「7日ごと」「毎週 月・木曜」「隔週 土曜」「毎月 第1日曜」「毎月 第1・第3 土・日曜」「3か月ごと 最終金曜」「1・4・7・10月 第1土曜」「毎月 末日」）。
 // 読むほうはゆるく、全角・空白・「曜日」の有無・区切りの違いなどを受け付ける。
 import { type DateStr, addDays, isDateStr, toDayNum } from "./date";
 import { WEEKDAYS, describeSchedule } from "./describe";
-import { type CalendarRule, type Schedule, nextOccurrenceAfter } from "./schedule";
+import { type CalendarRule, type Nth, type Schedule, nextOccurrenceAfter, sortNths } from "./schedule";
 
 /** 日数の上限（約10年） */
 export const MAX_INTERVAL_DAYS = 3660;
@@ -32,7 +32,7 @@ export function formatScheduleText(s: Schedule): string {
   return describeSchedule(s);
 }
 
-const EXAMPLES = "例：7日ごと、毎週 月・木、隔週 土、毎月 1日、毎月 第2火曜、毎月 末日";
+const EXAMPLES = "例：7日ごと、毎週 月・木、隔週 土、毎月 1日、毎月 第2火曜、毎月 第1・第3 土・日、6・12月 末日";
 const fail = (message: string): ParsedScheduleText => ({ ok: false, message });
 
 /** 全角→半角、空白を消す、言い回しをそろえる */
@@ -81,24 +81,27 @@ export function parseScheduleText(text: string, today: DateStr): ParsedScheduleT
   if (s === "隔日") return interval(2);
   if (/^週1回?$/.test(s)) return interval(7);
 
-  // ---- 毎月・Nか月ごと ----
-  const mm = s.match(/^(?:(毎月)|(隔月)|(\d+)か月(?:ごと|おき|毎)?)?(.*)$/)!;
-  const hasMonthPrefix = mm[1] !== undefined || mm[2] !== undefined || mm[3] !== undefined;
-  const everyMonths = mm[2] !== undefined ? 2 : mm[3] !== undefined ? Number(mm[3]) : 1;
-  const mBody = mm[4] ?? "";
-  if (/^(?:末日|月末|末)$/.test(mBody)) return calendar({ kind: "monthly_day", day: -1, every: everyMonths }, today);
+  // ---- 毎月・Nか月ごと・月を選ぶ（「1・4・7・10月」「6月12月」） ----
+  const mm = s.match(/^(?:(毎月)|(隔月)|(\d+)か月(?:ごと|おき|毎)?|((?:\d+月[・、,/と]?)+|\d+(?:[・、,/と]\d+)*月))?(.*)$/)!;
+  const hasMonthPrefix = mm[1] !== undefined || mm[2] !== undefined || mm[3] !== undefined || mm[4] !== undefined;
+  const months = mm[4] !== undefined ? [...new Set(mm[4].match(/\d+/g)!.map(Number))].sort((a, b) => a - b) : undefined;
+  if (months && !months.every((m) => m >= 1 && m <= 12)) return fail("月は1〜12月で書いてください");
+  const monthPart = months ? { every: 1, months } : { every: mm[2] !== undefined ? 2 : mm[3] !== undefined ? Number(mm[3]) : 1 };
+  const mBody = mm[5] ?? "";
+  if (/^(?:末日|月末|末)$/.test(mBody)) return calendar({ kind: "monthly_day", day: -1, ...monthPart }, today);
   const md = mBody.match(/^(\d+)日$/);
   if (md && (hasMonthPrefix || md[1] === "1")) {
     const day = Number(md[1]);
     if (day < 1 || day > 31) return fail("日にちは1〜31か「末日」で書いてください");
-    return calendar({ kind: "monthly_day", day, every: everyMonths }, today);
+    return calendar({ kind: "monthly_day", day, ...monthPart }, today);
   }
-  const mn = mBody.match(/^(?:第(\d+)|(最終|最後の?))([日月火水木金土])曜?$/);
+  // 「第1日曜」「最終金」「第1・第3 土・日」「第1,3土日」
+  const mn = mBody.match(/^((?:第\d+|最終|最後の?)(?:[・、,/と]?(?:第?\d+|最終|最後の?))*)[・、,/との]?(.+)$/);
   if (mn) {
-    const nth = mn[2] !== undefined ? -1 : Number(mn[1]);
-    if (nth !== -1 && (nth < 1 || nth > 5)) return fail("第何週は第1〜第5か「最終」で書いてください");
-    const weekday = WEEKDAYS.indexOf(mn[3] as (typeof WEEKDAYS)[number]);
-    return calendar({ kind: "monthly_nth_weekday", nth: nth as 1 | 2 | 3 | 4 | 5 | -1, weekday, every: everyMonths }, today);
+    const nths = mn[1]!.match(/\d+|最終|最後/g)!.map((t) => (/\d/.test(t) ? Number(t) : -1));
+    if (!nths.every((n) => n === -1 || (n >= 1 && n <= 5))) return fail("第何週は第1〜第5か「最終」で書いてください");
+    const weekdays = parseWeekdays(mn[2]!);
+    if (weekdays) return calendar({ kind: "monthly_nth_weekday", nths: sortNths(nths as Nth[]), weekdays, ...monthPart }, today);
   }
   if (hasMonthPrefix) {
     return fail(mBody === "" ? "何日か、第何何曜かを書いてください（例：毎月 1日、毎月 第2火曜、毎月 末日）" : `「${text.trim()}」の日にちが読めません（例：毎月 1日、毎月 第2火曜、毎月 末日）`);
