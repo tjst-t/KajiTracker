@@ -588,6 +588,27 @@
       "updatedAt": "2026-10-10T00:42:49.537Z",
       "closedAt": "2026-10-10T00:42:49.537Z",
       "extra": {}
+    },
+    {
+      "id": "ios-passkey-gesture",
+      "number": 26,
+      "kind": "bug",
+      "title": "iPhone の Safari でパスキーを作ると「取り消されました」になる（ボタンを押してから通信を待っている）",
+      "status": "ready",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "high",
+      "labels": [],
+      "body": "## 起きたこと（2026-10-10、本番）\nたくみさんの奥さんが iPhone SE（第2世代）で家族の招待を開き、名前を入れて「パスキーを作って参加する」を押すと「パスキーの確認が取り消されました」（NotAllowedError）で登録できない。Windows・Android の Chrome では同じ流れが通っている。\n\n## 原因の見立て\nSafari は、パスキーの作成・確認（navigator.credentials.create / get）を「人がボタンを押したその流れの中」で呼ばないと NotAllowedError にする。いまの作りは、ボタンを押してから API で options を取り（await fetch）、そのあとで startRegistration / startAuthentication を呼んでいるので、Safari では押した扱いが切れて断られる（Chrome は許している）。\n\n## 直し方\nパスキーを使う全部の入口で、options をボタンを押す前に用意しておき、ボタンの click の中では await を挟まずに最初に startRegistration / startAuthentication を呼ぶ（@simplewebauthn/browser 14）。\n- 招待（src/client/screens/Invite.tsx、src/client/auth.ts の registerViaInvite）：名前を入れる段と、パスキーを作る段に分ける。名前を入れて「次へ」で POST /api/invites/register/options を呼んで options を持っておき、次の画面の「パスキーを作る」で startRegistration をすぐ呼ぶ。\n- 札で入った直後のパスキー作成（src/client/screens/Ticket.tsx）、設定の「この端末のパスキーを作る」（src/client/screens/Settings.tsx）：画面を出したときに POST /api/auth/register/options を先に取っておく。step-up が要るときの扱いに注意（先に step-up が要るなら、step-up のボタン → その後で登録のボタン、と押してもらう段を分ける）。\n- ログイン（src/client/screens/Login.tsx、招待の「アカウントを持っている」も）：画面を出したときに POST /api/auth/login/options を取っておく。\n- step-up（src/client/auth.ts の stepUp・withStepUp）：「パスキーでもう一度確認してください」の段を出し、その段を出すときに options を取り、ボタンで startAuthentication を呼ぶ形にする（いまの、エラーを受けて自動でパスキーを出す形は Safari で断られる）。\n- challenge は 5 分で切れる（src/worker/auth/routes.ts）。用意した options が古くなったら（4分たったら、または verify が challenge_invalid を返したら）取り直す。challenge の Cookie（kaji-chal）は1つなので、同じ画面で2種類を同時に用意しないこと。\n- 失敗したときの文言を見直す：NotAllowedError のとき「パスキーを作れませんでした。iPhone では『設定 → [名前] → iCloud → パスワードとキーチェーン』がオンになっているか確かめてください。LINE などのアプリの中で開いている場合は、Safari で開き直してください。」のように、取り消し以外の原因も書く（src/client/auth.ts の explain）。\n\n## 確かめ方\n- 既存の e2e（login-flow・chores-flow など、パスキーを使うもの）がすべて通ること。招待の画面が2段になるので e2e を合わせて直す。\n- Playwright の WebKit（npx playwright install webkit）で、仮想パスキーが使えるなら招待→パスキー作成→参加を通す。使えなければ、click から startRegistration までの間に await fetch が無いこと（options は click の前に取られていること）を、ネットワークの順番で確かめる e2e を足す。\n- npx tsc -b・npm run build・npm test。ローカルの D1 を消さない。",
+      "doneWhen": "パスキーを使う全部の入口で、ボタンの click の中で最初に WebAuthn を呼ぶ形になり（options は前もって取得）、既存の e2e と新しい確認が通る。tsc・build・test が通る",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-10T02:48:38.385Z",
+      "updatedAt": "2026-10-10T02:48:38.385Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
