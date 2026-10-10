@@ -303,7 +303,7 @@
       "number": 8,
       "kind": "story",
       "title": "PWA とスマホ実機での確認",
-      "status": "ready",
+      "status": "done",
       "parent": null,
       "dependsOn": [
         "item-2",
@@ -314,12 +314,12 @@
       "labels": [],
       "body": "vite-plugin-pwa は使わず public/sw.js と manifest を手で書く（タスク pwa-install で取り込み済み。e2e:pwa で manifest 有効・SW 登録・インストール可能・オフラインの殻・/api はキャッシュしない・push で通知、を Chromium で確認）。残りは実機での確認だけ：banto の公開 URL（https://dev-ae103b83.banto.tjstkm.net）で、iPhone と Android でホーム画面に追加し、パスキーでログインし、通知が届くか。たくみさんの手が要る。",
       "doneWhen": "iPhone と Android でホーム画面に追加でき、パスキーでログインし、通知が届く",
-      "resolution": null,
+      "resolution": "本番（kaji.tjstkm.net）で Android の Chrome と Windows の Chrome にホーム画面のアプリとして入れ、パスキーでログインし、通知を受けられることを確認（2026-10-10 10:01 の通知テストで両方の配信が成功）。iPhone はまだ試していない。",
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-06T02:51:10.971Z",
-      "updatedAt": "2026-10-08T00:19:42.376Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-10T01:03:30.981Z",
+      "closedAt": "2026-10-10T01:03:30.981Z",
       "extra": {}
     },
     {
