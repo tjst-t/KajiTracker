@@ -10,7 +10,7 @@ import { chromium } from "playwright";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SHOTS = join(ROOT, "e2e", "screenshots");
 mkdirSync(SHOTS, { recursive: true });
-const BASE = (process.env.BASE ?? "http://localhost:5173").replace(/\/$/, "");
+const BASE = (process.env.BASE ?? process.env.E2E_ORIGIN ?? "http://localhost:5173").replace(/\/$/, "");
 
 const jst = (offsetDays = 0) => new Date(Date.now() + 9 * 3600_000 + offsetDays * 86400_000).toISOString().slice(0, 10);
 const weekdayOf = (d) => new Date(d + "T00:00:00Z").getUTCDay();
@@ -102,6 +102,7 @@ try {
   const { page: wife } = await device({ width: 390, height: 844 });
   await wife.goto(inviteLink);
   await wife.getByLabel("名前").fill("はなこ");
+  await wife.getByRole("button", { name: "次へ" }).click();
   await wife.getByRole("button", { name: "パスキーを作って参加する" }).click();
   await wife.getByRole("button", { name: "統計", exact: true }).waitFor();
   ok("はなこが参加");

@@ -18,8 +18,9 @@ const PHONE = { width: 390, height: 844 };
 
 const family = `辻下家${Date.now() % 10000}`; // 何度流しても名前が重ならないように
 
-const out = execSync("npm run -s bootstrap-link", { cwd: ROOT }).toString();
-const link = out.match(/http:\/\/localhost:5173\/#login=\S+/)[0];
+const ORIGIN = process.env.E2E_ORIGIN ?? "http://localhost:5173";
+const out = execSync(`npm run -s bootstrap-link -- --origin ${ORIGIN}`, { cwd: ROOT }).toString();
+const link = out.match(/http:\/\/localhost:\d+\/#login=\S+/)[0];
 
 const browser = await chromium.launch();
 const errors = [];
@@ -90,6 +91,8 @@ try {
   await wife.getByRole("heading", { name: `たくみさんが「${family}」に招待しています` }).waitFor();
   if (wife.url().includes("#invite=")) throw new Error("招待が URL に残っている");
   await wife.getByLabel("名前").fill("はなこ");
+  await wife.getByRole("button", { name: "次へ" }).click();
+  await wife.getByText("「はなこ」として参加します").waitFor();
   await wife.screenshot({ path: `${SHOTS}/05-invite-accept.png` });
   await wife.getByRole("button", { name: "パスキーを作って参加する" }).click();
   await todayOf(wife, family);

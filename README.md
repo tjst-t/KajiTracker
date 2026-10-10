@@ -21,6 +21,7 @@ npm run e2e                # 本物のブラウザ（Chromium）と仮想パス�
 開発サーバを別の URL（banto の公開など）から開くときは、`.dev.vars` の `ORIGINS` にその URL を足す。
 `e2e/push-flow.mjs`（通知のオン・オフ）は VAPID の鍵（下）が要る。別のポートで起こしたときは `E2E_ORIGIN=http://localhost:5174` のように渡す。
 ヘッドレスの Chromium は本物のプッシュサービスにつながらないので、購読（`pushManager.subscribe`）だけ偽物に差し替えて、画面と API の流れを確かめている。
+`e2e/gesture-flow.mjs` は、パスキーを使う全部の入口で、ボタンの click の中で最初に WebAuthn を呼んでいるか（click から create / get までに fetch が無いか）を確かめる。iPhone の Safari は、押してから通信を待ったあとで呼ぶと NotAllowedError で断るため、options は画面（段）を出したときに `usePrepared`（`src/client/auth.ts`）で前もって取っておく。
 `npm run e2e:pwa` は `npm run preview`（ビルドしたものを http://localhost:4173 で配る）を起こしてから。マニフェスト・Service Worker の登録・インストールできるか・オフラインで殻が開くか・/api がキャッシュされないかを確かめる。
 Chromium が「Socket path too long」で落ちるときは `TMPDIR=/tmp` を付けて流す。
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, type Family, type Me, api } from "./api";
 import { takeFragmentFromUrl } from "./auth";
+import { StepUpDialog } from "./components/Passkey";
 import { errorText } from "./format";
 import { FamilyCreate } from "./screens/FamilyCreate";
 import { FamilyScreen } from "./screens/FamilyScreen";
@@ -192,6 +193,7 @@ export function App() {
       ) : (
         <Today me={me} family={family} nav={nav} />
       )}
+      <StepUpDialog />
     </div>
   );
 }

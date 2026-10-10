@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type Me, type PasskeyItem, type SessionItem, type SessionVia, api } from "../api";
-import { registerPasskey, withStepUp } from "../auth";
+import { withStepUp } from "../auth";
+import { CreatePasskey } from "../components/Passkey";
 import { type IssuedQr, QrDialog } from "../components/QrDialog";
 import { errorText, formatDateTime } from "../format";
 import { type PushState, getPushState, turnOffPush, turnOnPush } from "../push";
@@ -28,6 +29,7 @@ export function Settings({ me, onChanged, onLoggedOut }: { me: Me; onChanged: ()
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const reload = useCallback(async () => {
     const [p, s] = await Promise.all([api<PasskeyItem[]>("GET", "/me/passkeys"), api<SessionItem[]>("GET", "/me/sessions")]);
@@ -125,7 +127,7 @@ export function Settings({ me, onChanged, onLoggedOut }: { me: Me; onChanged: ()
             ))}
           </ul>
         )}
-        <button className="btn" disabled={busy} onClick={() => void run(() => withStepUp(() => registerPasskey()), "この端末のパスキーを作りました")}>
+        <button className="btn" disabled={busy} onClick={() => setCreating(true)}>
           この端末のパスキーを作る
         </button>
       </section>
@@ -178,6 +180,16 @@ export function Settings({ me, onChanged, onLoggedOut }: { me: Me; onChanged: ()
         </button>
       </section>
 
+      {creating && (
+        <CreatePasskeyDialog
+          onCreated={() => {
+            setCreating(false);
+            void run(async () => {}, "この端末のパスキーを作りました");
+          }}
+          onClose={() => setCreating(false)}
+        />
+      )}
+
       {adding && (
         <QrDialog
           title="端末を追加"
@@ -201,6 +213,26 @@ export function Settings({ me, onChanged, onLoggedOut }: { me: Me; onChanged: ()
         />
       )}
     </main>
+  );
+}
+
+/** 設定から、この端末のパスキーを作る。開いたときに options を取っておき、ボタンですぐパスキーを出す */
+function CreatePasskeyDialog({ onCreated, onClose }: { onCreated: () => void; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (!dialog.current?.open) dialog.current?.showModal();
+  }, []);
+  return (
+    <dialog ref={dialog} className="dialog" onClose={onClose} aria-labelledby="create-passkey-title">
+      <div className="stack">
+        <h2 id="create-passkey-title">この端末のパスキーを作る</h2>
+        <p>次からは、この端末の顔認証や指紋でログインできます。</p>
+        <CreatePasskey onCreated={onCreated} />
+        <button className="btn btn--quiet" onClick={() => dialog.current?.close()}>
+          閉じる
+        </button>
+      </div>
+    </dialog>
   );
 }
 

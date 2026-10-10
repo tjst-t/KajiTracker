@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, type Me, api } from "../api";
-import { loginWithPasskey, registerViaInvite } from "../auth";
+import { fetchInviteOptions, fetchLoginOptions, loginWithPasskey, registerViaInvite, usePrepared } from "../auth";
 import { errorText } from "../format";
 
 type Info = { valid: false } | { valid: true; familyId: string; familyName: string; invitedBy: string; alreadyMember: boolean };
 
-/** S10 招待を受ける（#invite=…）。初めての人は名前とパスキー、アカウントがある人はログインして参加 */
+/**
+ * S10 招待を受ける（#invite=…）。初めての人は名前 →「次へ」→ パスキー、アカウントがある人はログインして参加。
+ * パスキーの options は、その段を出したときに取っておく（Safari は押してから通信を待つと断る）。
+ * challenge の Cookie は1つなので、用意するのはいま出ている段の1つだけ
+ */
 export function InviteScreen({ token, me, onJoined, onCancel }: { token: string; me: Me | null; onJoined: (familyId: string) => void; onCancel: () => void }) {
   const [info, setInfo] = useState<Info | null>(null);
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [name, setName] = useState("");
+  const [named, setNamed] = useState(false); // 名前を入れて「次へ」を押した
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +38,12 @@ export function InviteScreen({ token, me, onJoined, onCancel }: { token: string;
       setBusy(false);
     }
   };
+
+  const newcomer = info?.valid === true && !me;
+  const reg = usePrepared(newcomer && mode === "new" && named, () => fetchInviteOptions(token, name.trim()));
+  const login = usePrepared(newcomer && mode === "existing", fetchLoginOptions);
+  const prepared = mode === "new" ? reg : login;
+  const prepError = prepared.failure ? errorText(prepared.failure) : null;
 
   const accept = async () => (await api<{ familyId: string }>("POST", "/invites/accept", { token })).familyId;
 
@@ -90,32 +101,71 @@ export function InviteScreen({ token, me, onJoined, onCancel }: { token: string;
                 </button>
               </div>
 
-              {mode === "new" ? (
+              {mode === "new" && !named ? (
                 <form
                   className="stack"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    void act(async () => (await registerViaInvite(token, name.trim())).familyId);
+                    setError(null);
+                    setNamed(true);
                   }}
                 >
-                  <p>家族に見える名前を入れて、この端末のパスキーを作ります。次からは顔認証や指紋でログインできます。</p>
+                  <p>家族に見える名前を入れてください。次の画面で、この端末のパスキーを作ります。</p>
                   <label className="field">
                     <span>名前</span>
                     <input value={name} onChange={(e) => setName(e.target.value)} maxLength={20} required placeholder="例：はなこ" />
                   </label>
-                  <button className="btn btn--primary" type="submit" disabled={busy || !name.trim()}>
-                    {busy ? "作っています…" : "パスキーを作って参加する"}
+                  <button className="btn btn--primary" type="submit" disabled={!name.trim()}>
+                    次へ
                   </button>
                 </form>
+              ) : mode === "new" ? (
+                <div className="stack">
+                  <p>
+                    「{name.trim()}」として参加します。この端末のパスキーを作ると、次からは顔認証や指紋でログインできます。
+                  </p>
+                  {prepError && (
+                    <p className="error" role="alert">
+                      {prepError}
+                    </p>
+                  )}
+                  <button
+                    className="btn btn--primary"
+                    disabled={busy || !reg.ready}
+                    onClick={() => void act(async () => (await reg.start((o) => registerViaInvite(o, token))).familyId)}
+                  >
+                    {busy ? "作っています…" : reg.ready ? "パスキーを作って参加する" : "用意しています…"}
+                  </button>
+                  {prepError && (
+                    <button className="btn" onClick={reg.reload}>
+                      もう一度用意する
+                    </button>
+                  )}
+                  <button
+                    className="btn btn--quiet"
+                    disabled={busy}
+                    onClick={() => {
+                      setError(null);
+                      setNamed(false);
+                    }}
+                  >
+                    名前を直す
+                  </button>
+                </div>
               ) : (
                 <div className="stack">
                   <p>ほかの Family でもう KajiTracker を使っているなら、そのアカウントでログインして参加します。</p>
+                  {prepError && (
+                    <p className="error" role="alert">
+                      {prepError}
+                    </p>
+                  )}
                   <button
                     className="btn btn--primary"
-                    disabled={busy}
+                    disabled={busy || !login.ready}
                     onClick={() =>
                       void act(async () => {
-                        await loginWithPasskey();
+                        await login.start(loginWithPasskey);
                         // すでに入っていたなら、そのまま開く
                         return accept().catch((e) => {
                           if (e instanceof ApiError && e.code === "already_member") return info.familyId;
@@ -124,8 +174,13 @@ export function InviteScreen({ token, me, onJoined, onCancel }: { token: string;
                       })
                     }
                   >
-                    パスキーでログインして参加する
+                    {busy ? "確認しています…" : login.ready ? "パスキーでログインして参加する" : "用意しています…"}
                   </button>
+                  {prepError && (
+                    <button className="btn" onClick={login.reload}>
+                      もう一度用意する
+                    </button>
+                  )}
                 </div>
               )}
             </>

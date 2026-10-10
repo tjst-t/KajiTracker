@@ -1,17 +1,19 @@
 import { useState } from "react";
-import { loginWithPasskey } from "../auth";
+import { fetchLoginOptions, loginWithPasskey, usePrepared } from "../auth";
 import { errorText } from "../format";
 
 /** S9 ログイン。新規登録の入口は置かない（招待の QR からだけ） */
 export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // options は画面を出したときに取っておき、押したらすぐパスキーを出す（Safari は押してから通信を待つと断る）
+  const prepared = usePrepared(true, fetchLoginOptions);
 
   const login = async () => {
     setBusy(true);
     setError(null);
     try {
-      await loginWithPasskey();
+      await prepared.start(loginWithPasskey);
       onLoggedIn();
     } catch (e) {
       setError(errorText(e));
@@ -26,13 +28,18 @@ export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
       <p className="lede">
         家事の<span className="nobr">「前にやった日」</span>と<span className="nobr">「次にやる日」</span>を、家族で覚えておく。
       </p>
-      <button className="btn btn--primary btn--large" onClick={login} disabled={busy}>
-        {busy ? "確認しています…" : "パスキーでログイン"}
+      <button className="btn btn--primary btn--large" onClick={login} disabled={busy || !prepared.ready}>
+        {busy ? "確認しています…" : prepared.ready ? "パスキーでログイン" : "用意しています…"}
       </button>
-      {error && (
+      {(error || !!prepared.failure) && (
         <p className="error" role="alert">
-          {error}
+          {error ?? errorText(prepared.failure)}
         </p>
+      )}
+      {!!prepared.failure && (
+        <button className="btn" onClick={prepared.reload}>
+          もう一度用意する
+        </button>
       )}
       <p className="note">
         はじめて使うときは、家族から招待の QR を受け取ってください。

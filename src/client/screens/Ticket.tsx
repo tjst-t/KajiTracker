@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import { registerPasskey } from "../auth";
+import { CreatePasskey } from "../components/Passkey";
 import { errorText } from "../format";
 
 type Info = { valid: false } | { valid: true; kind: "device" | "recovery" | "bootstrap" };
@@ -11,7 +11,6 @@ export function TicketScreen({ token, onDone }: { token: string; onDone: () => v
   const [step, setStep] = useState<Step>("checking");
   const [name, setName] = useState("");
   const [passkeyName, setPasskeyName] = useState("");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const redeem = async (displayName?: string) => {
@@ -43,19 +42,6 @@ export function TicketScreen({ token, onDone }: { token: string; onDone: () => v
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
-
-  const createPasskey = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await registerPasskey(passkeyName.trim() || undefined);
-      onDone();
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <main className="page page--narrow">
@@ -106,14 +92,8 @@ export function TicketScreen({ token, onDone }: { token: string; onDone: () => v
             <span>パスキーの名前（省くと端末の種類から付けます）</span>
             <input value={passkeyName} onChange={(e) => setPasskeyName(e.target.value)} maxLength={40} placeholder="例：たくみの iPhone" />
           </label>
-          {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
-          )}
-          <button className="btn btn--primary" onClick={createPasskey} disabled={busy}>
-            {busy ? "作っています…" : "パスキーを作る"}
-          </button>
+          {/* options は、この段を出したときに取っておく（Safari は押してから通信を待つと断る） */}
+          <CreatePasskey name={passkeyName.trim() || undefined} onCreated={onDone} />
           <button className="btn btn--quiet" onClick={onDone}>
             あとで作る
           </button>
