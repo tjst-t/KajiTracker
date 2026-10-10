@@ -573,7 +573,7 @@
       "number": 25,
       "kind": "task",
       "title": "周期：第何週・曜日の複数選択と、nか月ごと／月を選ぶ",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [],
       "milestone": null,
@@ -585,7 +585,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-10T00:24:03.460Z",
-      "updatedAt": "2026-10-10T00:24:03.460Z",
+      "updatedAt": "2026-10-10T00:24:11.418Z",
       "closedAt": null,
       "extra": {}
     }
