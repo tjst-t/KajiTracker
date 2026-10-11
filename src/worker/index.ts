@@ -7,6 +7,7 @@ import { choreRoutes } from "./chores/routes";
 import { familyRoutes } from "./families/routes";
 import { sendDueNotifications } from "./push/notify";
 import { pushRoutes } from "./push/routes";
+import { shoppingRoutes } from "./shopping/routes";
 import { purgeExpiredSessions } from "./auth/session";
 import { statsRoutes } from "./stats/routes";
 import { DAY, isoBefore, nowIso } from "./context";
@@ -30,6 +31,7 @@ app.route("/", groupRoutes);
 app.route("/", choreRoutes);
 app.route("/", statsRoutes);
 app.route("/", pushRoutes);
+app.route("/", shoppingRoutes);
 
 app.notFound((c) => c.json({ error: "その API はありません" }, 404));
 app.onError((err, c) => {

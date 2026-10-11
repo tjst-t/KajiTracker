@@ -95,17 +95,18 @@ try {
   ok("タブは「今日・TODO・買い物・家事・その他」、390px でも1行に収まり、どれも 44px 以上");
 
   const current = async (page) => (await page.getByRole("navigation", { name: "画面" }).locator('[aria-current="page"]').innerText()).trim();
-  for (const [label, path] of [
-    ["TODO", "/todos"],
-    ["買い物", "/shopping"],
+  for (const [label, path, ready] of [
+    ["TODO", "/todos", () => phone.getByText("準備中です").waitFor()],
+    // 買い物の中身は e2e/shopping-flow.mjs
+    ["買い物", "/shopping", () => phone.getByRole("tablist", { name: "お店" }).waitFor()],
   ]) {
     await nav.getByRole("button", { name: label, exact: true }).click();
     await h1(phone, label);
-    await phone.getByText("準備中です").waitFor();
+    await ready();
     if (new URL(phone.url()).pathname !== path) throw new Error(`URL が ${path} でない: ${phone.url()}`);
     if ((await current(phone)) !== label) throw new Error(`${label} のタブが選ばれていない`);
   }
-  ok("TODO・買い物は /todos・/shopping で「準備中です」");
+  ok("TODO は /todos で「準備中です」、買い物は /shopping でお店のリスト");
 
   await nav.getByRole("button", { name: "その他", exact: true }).click();
   await h1(phone, "その他");

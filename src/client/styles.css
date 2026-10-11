@@ -1933,3 +1933,263 @@ select {
   overflow-y: auto;
   margin-bottom: 0.5rem;
 }
+
+/* ---- 買い物：お店ごとの「買い物メモ」 ---- */
+
+/* お店のタブ：横に並べ、入りきらなければ横にすべらせる */
+.shop-lists {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  margin: 0 0 1.25rem;
+  scrollbar-width: thin;
+}
+.shop-lists__tab {
+  font: inherit;
+  font-weight: 700;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.75rem;
+  padding: 0.375rem 1rem;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.shop-lists__tab[aria-selected="true"] {
+  background: var(--ink);
+  color: #fff;
+}
+.shop-lists__count {
+  font-size: var(--t-small);
+  font-weight: 500;
+  line-height: 1.5;
+  padding: 0 0.4375rem;
+  border-radius: 999px;
+  background: var(--ground);
+  color: var(--ink);
+}
+
+/* 品物を足す：スマホでは名前を1行、その下に数量メモ・売り場・足す。PC では1行 */
+.shop-add {
+  margin-bottom: 1.25rem;
+}
+.shop-add__form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  grid-template-areas:
+    "name name name"
+    "note section submit";
+  gap: 0.5rem;
+  align-items: end;
+}
+.shop-add__form .field {
+  margin: 0;
+  max-width: none;
+  min-width: 0;
+}
+.shop-add__name {
+  grid-area: name;
+}
+.shop-add__note {
+  grid-area: note;
+}
+.shop-add__section {
+  grid-area: section;
+}
+.shop-add__submit {
+  grid-area: submit;
+  min-width: 4.5rem;
+}
+@media (min-width: 48rem) {
+  .shop-add__form {
+    grid-template-columns: 2fr 1.25fr 1.25fr auto;
+    grid-template-areas: "name note section submit";
+  }
+}
+
+/* よく買うもの：押すとすぐ入るチップ */
+.shop-frequent {
+  margin-top: 0.875rem;
+}
+.shop-frequent__title {
+  margin: 0 0 0.375rem;
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+}
+.shop-frequent__chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.chip {
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.875rem 0.25rem 0.625rem;
+  border: 1px solid var(--ai);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ai);
+  font-weight: 500;
+  cursor: pointer;
+}
+.chip:hover {
+  background: var(--ai);
+  color: #fff;
+}
+.chip__plus {
+  font-weight: 700;
+}
+
+/* 買い物メモの紙：罫線の上に品物を書いたように。売り場は見出しで分ける */
+.memo {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--ink);
+  border-radius: 0.375rem;
+  padding-top: 0.25rem;
+  overflow: hidden;
+}
+.memo__section:last-child .memo__item:last-child {
+  border-bottom: 0;
+}
+.memo__section + .memo__section {
+  margin-top: 0.5rem;
+}
+.memo__heading {
+  font-size: var(--t-small);
+  font-weight: 700;
+  color: var(--ink-soft);
+  margin: 0;
+  padding: 0.75rem 1rem 0.25rem;
+  border-bottom: 2px solid var(--ink);
+}
+.memo__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.memo__item {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--line);
+}
+.memo__toggle {
+  font: inherit;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.25rem; /* 片手の親指で押せる高さ */
+  padding: 0.375rem 0.5rem 0.375rem 1rem;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.memo__check {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.memo__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.625rem;
+}
+.memo__name {
+  font-size: 1.125rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.memo__note {
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+}
+.memo__who {
+  flex: none;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+.memo__remove {
+  font: inherit;
+  flex: none;
+  width: 2.75rem;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.memo__remove:hover {
+  color: var(--danger);
+}
+/* カゴに入れた：薄く、取り消し線。印は若竹の丸に白いチェック */
+.memo__item.is-in-cart .memo__text {
+  opacity: 0.5;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+.memo__item.is-in-cart .memo__check {
+  background: var(--wakatake);
+  border-color: var(--wakatake);
+}
+.memo__item.is-in-cart .memo__check::after {
+  content: "";
+  width: 0.375rem;
+  height: 0.75rem;
+  margin-top: -0.125rem;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.memo__item.is-in-cart .memo__who {
+  color: var(--wakatake);
+}
+.shop-empty {
+  padding: 1.5rem 1rem;
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: 0.375rem;
+  color: var(--ink-soft);
+}
+
+/* 買い物を終える：下に貼り付け、片手で押せる場所に（スマホでは下のタブの上） */
+.shop-checkout {
+  position: sticky;
+  bottom: 0.75rem;
+  margin-top: 1rem;
+  z-index: 1;
+}
+.shop-checkout .btn--large {
+  margin: 0;
+  box-shadow: 0 0 0 0.375rem var(--ground);
+}
+@media (max-width: 40rem) {
+  .shop-checkout {
+    bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
+.shop-editor__title {
+  font-size: var(--t-body);
+  margin: 1.25rem 0 0.5rem;
+}

@@ -9,6 +9,7 @@ import { DAY, fail, isoAfter, nowIso, requireAuth } from "../context";
 import { choreGroups, chores, families, familyMembers, invites, loginTickets, passkeys, users } from "../db/schema";
 import { rateLimit } from "../guards";
 import { base64urlToBytes, newId, randomToken, sha256Hex } from "../lib/crypto";
+import { insertDefaultShopping } from "../shopping/defaults";
 
 const INVITE_TTL = DAY;
 /** Family を作ったときに最初からあるグループ */
@@ -115,6 +116,7 @@ export const familyRoutes = new Hono<AppEnv>()
       db.insert(families).values({ id, name: n }),
       db.insert(familyMembers).values({ familyId: id, userId: user.id, role: "admin" }),
       db.insert(choreGroups).values(DEFAULT_GROUPS.map((name, i) => ({ id: newId(), familyId: id, name, sortOrder: i }))),
+      ...insertDefaultShopping(db, id),
     ]);
     return c.json({ id, name: n, role: "admin" as Role }, 201);
   })

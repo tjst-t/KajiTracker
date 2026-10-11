@@ -10,6 +10,7 @@ import { MoreScreen } from "./screens/More";
 import { SoonScreen } from "./screens/Soon";
 import { Login } from "./screens/Login";
 import { Settings } from "./screens/Settings";
+import { Shopping } from "./screens/Shopping";
 import { StatsScreen } from "./screens/Stats";
 import { ChoreDetail } from "./screens/ChoreDetail";
 import { ChoreForm } from "./screens/ChoreForm";
@@ -188,7 +189,7 @@ export function App() {
       ) : route.name === "todos" ? (
         <SoonScreen title="TODO" />
       ) : route.name === "shopping" ? (
-        <SoonScreen title="買い物" />
+        <Shopping key={family.id} me={me} family={family} />
       ) : route.name === "chores" ? (
         <Chores family={family} nav={nav} />
       ) : route.name === "chore-table" ? (

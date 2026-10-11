@@ -1,6 +1,6 @@
 # KajiTracker 設計メモ（データ・期限の計算・画面・API）
 
-最終更新：2026-10-06
+最終更新：2026-10-11
 仕様は `docs/spec.md`。このメモは「どう作るか」を書く。
 
 ## 1. データの形（D1 / SQLite）
@@ -152,6 +152,28 @@ Family を作ると「キッチン・風呂・トイレ・洗濯・ゴミ捨て�
 | created_at | timestamp | |
 | deleted_at | timestamp NULL | 取り消し。統計と期限の計算から外す |
 
+### 買い物
+
+**shopping_lists**（お店ごとのリスト）：id, family_id, name（1〜20文字）, sort_order, created_at。Family を作ると「スーパー・コストコ・IKEA」を入れる（`src/worker/shopping/defaults.ts`。前からある Family には 0004 のマイグレーションで入れた）。1つの Family に20個まで。
+
+**shopping_sections**（売り場）：id, list_id, name（1〜20文字）, sort_order, created_at。リストを作ると最初の10の売り場を入れる。1つのリストに30個まで。
+
+**shopping_items**（リストにある品物）
+| 列 | 型 | 説明 |
+|---|---|---|
+| id | text PK | 画面で作ってよい（8〜64文字の英数字・`-`・`_`）。同じ id の追加は1件にする |
+| list_id / family_id | text FK | family_id は認可の確かめ用 |
+| name | text | 1〜40文字 |
+| note | text NULL | 数量やメモ（40文字まで） |
+| section_id | text FK NULL | 売り場。NULL なら売り場なし（売り場を消すと NULL） |
+| status | text | `open`（未購入）/ `in_cart`（カゴに入れた） |
+| added_by / cart_by | text FK NULL | 入れた人／カゴに入れた人 |
+| created_at / updated_at | timestamp | |
+1つのリストに300個まで。
+
+**shopping_purchases**（買った記録）：id（品物の id をそのまま使い、二重に記録しない）, list_id, family_id, name, note, section_id（FK NULL）, section_name（売り場を消しても名前を残す）, user_id（カゴに入れた人。いなければ「買い物を終える」を押した人）, bought_at。
+「よく買うもの」は、ここをリストと名前でまとめ、回数の多い順・最後に買った日時の新しい順に並べる。売り場は最後に買ったときのもの。
+
 ### 通知
 
 **push_subscriptions**
@@ -203,7 +225,7 @@ Family を作ると「キッチン・風呂・トイレ・洗濯・ゴミ捨て�
 
 ## 4. 画面
 
-タブは「今日・家事・家族・設定」。スマホでは画面の下に固定、PC ではヘッダーの右。Family が2つ以上なら上に切り替え。統計は「統計」のストーリーでタブを足す。
+タブは「今日・TODO・買い物・家事・その他」（統計・家族・設定は「その他」の中）。スマホでは画面の下に固定、PC ではヘッダーの右。Family が2つ以上なら上に切り替え。統計は「統計」のストーリーでタブを足す。
 
 今日の画面は「当番表」。期限が来ている家事を「当番札」（左に紐の穴、黒い縁）で並べ、遅れは朱の判子「3日遅れ」、今日は藍の判子「今日」。「やった」を押すと札が裏返って「済」と取り消しを6秒見せ、そのあと並べ直す（動きを減らす設定では裏返さずに切り替える）。
 
@@ -221,6 +243,9 @@ Family を作ると「キッチン・風呂・トイレ・洗濯・ゴミ捨て�
 | S10 | 招待を受ける（`#invite=…`） | スマホ | 初めての人：表示名 → パスキー作成 → 参加。アカウントがある人：ログイン → 参加 |
 | S11 | 札で入る（`#login=…`） | 両方 | 引き換え → 続けて「この端末のパスキーを登録」 |
 | S12 | ホーム画面に追加の案内 | スマホ | iPhone で、ホーム画面に追加していない状態で通知をオンにしようとしたときに出す |
+| S13 | 買い物（`/shopping`） | スマホ | 上にお店のタブ（横に並び、入りきらなければ横にすべる。数は未購入＋カゴ）。「品物を足す」（名前・数量メモ・売り場。PC 幅は1行）と、その下に「よく買うもの」のチップ。品物は「買い物メモ」の紙に、売り場の見出しごとに並べ、押すとカゴへ（もう一度で戻る）。下に貼り付けた「買い物を終える（N点）」。いちばん下に「リストと売り場を編集」 |
+
+買い物の画面は、書き込みを先に画面へ映してから送る（品物の id は画面で作る）。5秒ごと（`document.visibilityState` が visible のときだけ。見えるようになったときにもすぐ）に `GET /shopping-lists/:id` を読み直す。書き込みの途中に返ってきた読み直しは捨てる（古い中身で戻さないため）。
 
 やり方の Markdown は `components/Markdown.tsx`（react-markdown＋remark-gfm、`skipHtml`。rehype-raw は使わない）で React の要素にするだけで、HTML の文字列を作らない。HTML の直書きは捨て、`javascript:` などのリンクは react-markdown が消す。見出しは画面の見出しの下に入るよう `#` を h3 から。リンクは `target=_blank rel="noopener noreferrer"`、チェックリストの印は押せない飾り、画像は読み込まずリンクにする。重いので lazy で読む（`components/Howto.tsx`）。今日の札の「やり方」は札のメタの行の終わりに小さく置き、押すとダイアログで読む。表で編集の「やり方」のマス（あり／—）を押すと、書く欄とプレビューの小さな画面が開き、「決める」でマスに入れる（保存は表の保存ボタン）。
 
@@ -285,6 +310,17 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
       // score ＝ 平均の遅れ日数 ＋ missed の回数。0 より大きいものを多い順に上位10
 }
 ```
+
+**買い物**（どれも Family のメンバーだけ。よその Family のものは 404）
+- `GET /families/:fid/shopping-lists`（リストと、それぞれの `openCount`・`cartCount`）、`POST /families/:fid/shopping-lists`（`{name}`。最初の売り場も入れる）
+- `GET /shopping-lists/:id` → `{ list, lists, sections, items, frequent: [{ name, count, lastBoughtAt, sectionId }] }`（画面はこれだけを読み直す。frequent はリストにある名前を除いて50個まで）
+- `PATCH /shopping-lists/:id`（名前・並び順）、`DELETE /shopping-lists/:id`（売り場・品物・買った記録も消える）
+- `POST /shopping-lists/:id/sections`、`PATCH /shopping-sections/:id`（名前・並び順）、`DELETE /shopping-sections/:id`（品物は売り場なしに）
+- `POST /shopping-lists/:id/items`（`{ id?, name, note?, sectionId? }`）。同じ id がもうあれば何も変えず 200 で今の品物を返す（新しく入れたら 201）。よそのリストの id なら 409。`sectionId` を送らなければ前に買ったときの売り場、`null` なら売り場なし
+- `PATCH /shopping-items/:id`（`{ status?: "open"|"in_cart", name?, note?, sectionId? }`）。状態は切り替えではなく、なってほしい状態を送る。最後に書いた方が勝ち。無ければ 404
+- `DELETE /shopping-items/:id`：もう無くても 200（`deleted: false`）
+- `POST /shopping-lists/:id/checkout`（`{ itemIds? }`）：カゴの品物（itemIds があれば、そのうちカゴにあるもの）を買った記録に移してリストから外す。返り値は `{ purchased, names }`。送り直しても二重にならない
+- `GET /shopping-lists/:id/purchases?limit=`（買った記録、新しい順。`{ name, note, sectionName, listName, userName, boughtAt }`）
 
 **通知**
 - `GET /push/vapid-public-key`

@@ -186,3 +186,67 @@ export const notificationsSent = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.choreId, t.dueOn] })],
 );
+
+// ---- 買い物 ----
+
+/** 買い物のリスト（お店ごと：スーパー・コストコなど） */
+export const shoppingLists = sqliteTable(
+  "shopping_lists",
+  {
+    id: text().primaryKey(),
+    familyId: text("family_id").notNull().references(() => families.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: now("created_at"),
+  },
+  (t) => [index("shopping_lists_family").on(t.familyId)],
+);
+
+/** リストごとの売り場（野菜・果物など） */
+export const shoppingSections = sqliteTable(
+  "shopping_sections",
+  {
+    id: text().primaryKey(),
+    listId: text("list_id").notNull().references(() => shoppingLists.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: now("created_at"),
+  },
+  (t) => [index("shopping_sections_list").on(t.listId)],
+);
+
+/** リストに入っている品物。id は画面で作ってもよい（同じ id で2回足しても1件） */
+export const shoppingItems = sqliteTable(
+  "shopping_items",
+  {
+    id: text().primaryKey(),
+    listId: text("list_id").notNull().references(() => shoppingLists.id, { onDelete: "cascade" }),
+    familyId: text("family_id").notNull().references(() => families.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    note: text(), // 数量やメモ（例：2パック）
+    sectionId: text("section_id").references(() => shoppingSections.id, { onDelete: "set null" }),
+    status: text({ enum: ["open", "in_cart"] }).notNull().default("open"),
+    addedBy: text("added_by").references(() => users.id, { onDelete: "set null" }),
+    cartBy: text("cart_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: now("created_at"),
+    updatedAt: now("updated_at"),
+  },
+  (t) => [index("shopping_items_list").on(t.listId)],
+);
+
+/** 買った記録（「買い物を終える」でカゴの品物をここへ移す）。よく買うものはここから数える */
+export const shoppingPurchases = sqliteTable(
+  "shopping_purchases",
+  {
+    id: text().primaryKey(), // 品物の id をそのまま使う（同じ品物を二度記録しない）
+    listId: text("list_id").notNull().references(() => shoppingLists.id, { onDelete: "cascade" }),
+    familyId: text("family_id").notNull().references(() => families.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    note: text(),
+    sectionId: text("section_id").references(() => shoppingSections.id, { onDelete: "set null" }),
+    sectionName: text("section_name"), // 売り場を消しても履歴に名前を残す
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }), // カゴに入れた人（買った人）
+    boughtAt: now("bought_at"),
+  },
+  (t) => [index("shopping_purchases_list_name").on(t.listId, t.name), index("shopping_purchases_family").on(t.familyId, t.boughtAt)],
+);

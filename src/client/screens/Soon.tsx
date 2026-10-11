@@ -1,4 +1,4 @@
-/** まだ作っていない画面（TODO・買い物）。後のタスクで中身を作る */
+/** まだ作っていない画面（TODO）。後のタスクで中身を作る */
 export function SoonScreen({ title }: { title: string }) {
   return (
     <main className="page">
