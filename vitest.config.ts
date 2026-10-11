@@ -22,6 +22,8 @@ export default defineConfig(async () => {
     test: {
       include: ["src/**/*.test.ts"],
       setupFiles: ["./test/apply-migrations.ts"],
+      // テストごとにパスキーを作って Family を作るので、全部を並べて流すと遅い機械では 5 秒を超えることがある
+      testTimeout: 30_000,
     },
   };
 });
