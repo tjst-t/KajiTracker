@@ -56,7 +56,7 @@ function scheduleColumns(input: unknown, today: DateStr, previous?: ChoreRow) {
 }
 
 /** 担当者を確かめる。known（先に引いたその Family の人の id）があれば DB を引かない */
-async function validAssignee(c: Ctx, familyId: string, assignee: unknown, known?: Set<string>): Promise<string | null> {
+export async function validAssignee(c: Ctx, familyId: string, assignee: unknown, known?: Set<string>): Promise<string | null> {
   if (assignee === null || assignee === undefined || assignee === "") return null;
   if (typeof assignee !== "string") fail(400, "担当者が正しくありません");
   if (known) return known.has(assignee) ? assignee : fail(400, "担当者はこの Family の人から選んでください");
@@ -76,7 +76,7 @@ function validName(name: unknown): string {
   return n;
 }
 
-function validChoreNotify(t: unknown): string | null {
+export function validChoreNotify(t: unknown): string | null {
   if (t === null || t === undefined || t === "") return null;
   if (typeof t !== "string" || !validNotifyTime(t)) fail(400, "通知の時刻は 15 分きざみ（例 07:00）で選んでください");
   return t;

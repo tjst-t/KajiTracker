@@ -250,3 +250,55 @@ export const shoppingPurchases = sqliteTable(
   },
   (t) => [index("shopping_purchases_list_name").on(t.listId, t.name), index("shopping_purchases_family").on(t.familyId, t.boughtAt)],
 );
+
+// ---- TODO（一回限り） ----
+
+/** 一回限りの TODO。済ませても消さずに残す（done_at が NULL なら未完了） */
+export const todos = sqliteTable(
+  "todos",
+  {
+    id: text().primaryKey(),
+    familyId: text("family_id").notNull().references(() => families.id, { onDelete: "cascade" }),
+    title: text().notNull(),
+    /** メモ（Markdown、最大 10000 文字）。家事のやり方と同じに、画面では HTML を出さずに描く */
+    memo: text(),
+    dueOn: text("due_on"),
+    assigneeUserId: text("assignee_user_id").references(() => users.id, { onDelete: "set null" }),
+    groupId: text("group_id").references(() => choreGroups.id, { onDelete: "set null" }),
+    notifyTime: text("notify_time"),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+    doneAt: text("done_at"),
+    doneBy: text("done_by").references(() => users.id, { onDelete: "set null" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: now("created_at"),
+    updatedAt: now("updated_at"),
+  },
+  (t) => [index("todos_family_done").on(t.familyId, t.doneAt), index("todos_due").on(t.dueOn)],
+);
+
+/** TODO のサブタスク（1段だけ。サブタスクの下には作れない） */
+export const todoSubtasks = sqliteTable(
+  "todo_subtasks",
+  {
+    id: text().primaryKey(),
+    todoId: text("todo_id").notNull().references(() => todos.id, { onDelete: "cascade" }),
+    title: text().notNull(),
+    doneAt: text("done_at"),
+    doneBy: text("done_by").references(() => users.id, { onDelete: "set null" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: now("created_at"),
+  },
+  (t) => [index("todo_subtasks_todo").on(t.todoId)],
+);
+
+/** TODO の通知を送った記録（notifications_sent の TODO 版）。同じ期限で二度送らない */
+export const todoNotificationsSent = sqliteTable(
+  "todo_notifications_sent",
+  {
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    todoId: text("todo_id").notNull().references(() => todos.id, { onDelete: "cascade" }),
+    dueOn: text("due_on").notNull(),
+    sentAt: now("sent_at"),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.todoId, t.dueOn] })],
+);

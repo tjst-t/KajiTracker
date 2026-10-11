@@ -57,6 +57,20 @@ async function setup() {
     );
     return id;
   }
+  async function todo(familyId: string, title: string, o: { dueOn?: string | null; assignee?: string; notifyTime?: string; done?: boolean } = {}) {
+    const id = `${p}-${title}`;
+    await run(
+      "INSERT INTO todos (id, family_id, title, due_on, assignee_user_id, notify_time, done_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      id,
+      familyId,
+      title,
+      o.dueOn === undefined ? TODAY : o.dueOn,
+      o.assignee ?? null,
+      o.notifyTime ?? null,
+      o.done ? new Date().toISOString() : null,
+    );
+    return id;
+  }
   async function log(choreId: string, userId: string, doneOn: string) {
     await run("INSERT INTO logs (id, chore_id, family_id, user_id, done_on) SELECT ?, id, family_id, ?, ? FROM chores WHERE id = ?", crypto.randomUUID(), userId, doneOn, choreId);
   }
@@ -75,7 +89,13 @@ async function setup() {
       .all<{ chore_id: string; due_on: string }>()
       .then((r) => r.results);
 
-  return { user, family, chore, log, received, sentRows };
+  const sentTodoRows = (userId: string) =>
+    env.DB.prepare("SELECT todo_id, due_on FROM todo_notifications_sent WHERE user_id = ? ORDER BY todo_id")
+      .bind(userId)
+      .all<{ todo_id: string; due_on: string }>()
+      .then((r) => r.results);
+
+  return { user, family, chore, todo, log, received, sentRows, sentTodoRows };
 }
 
 afterEach(() => {
@@ -146,5 +166,49 @@ describe("Cron で当日の家事を送る", () => {
     const calls = mockPushService(() => 201);
     await runCron(new Date("2026-10-06T15:00:00Z"));
     expect(await s.received(calls)).toEqual({ [a]: [{ title: "今日の家事", body: "ゴミ出し", url: "/" }] });
+  });
+});
+
+describe("Cron で期限が今日の TODO を送る", () => {
+  it("家事と同じ時刻帯なら1通にまとめ、二度は送らない。遅れ・済み・期限なしは送らない", async () => {
+    const s = await setup();
+    const a = await s.user("あ", "20:00");
+    const b = await s.user("い", "21:00");
+    const fam = await s.family("自宅", [a, b]);
+    await s.chore(fam, "ゴミ出し", { assignee: a });
+    const call = await s.todo(fam, "役所に電話", { assignee: a });
+    const shaken = await s.todo(fam, "車検の予約");
+    await s.todo(fam, "昨日まで", { dueOn: "2026-10-06" });
+    await s.todo(fam, "済み", { done: true });
+    await s.todo(fam, "期限なし", { dueOn: null });
+
+    let calls = mockPushService(() => 201);
+    await runCron(at("20:00"));
+    expect(await s.received(calls)).toEqual({
+      [a]: [{ title: "今日の家事", body: "今日の家事：ゴミ出し／TODO：役所に電話・車検の予約", url: "/" }],
+    });
+    expect(await s.sentTodoRows(a)).toEqual([call, shaken].sort().map((todo_id) => ({ todo_id, due_on: TODAY })));
+
+    vi.restoreAllMocks();
+    calls = mockPushService(() => 201);
+    await runCron(at("20:05"));
+    expect(await s.received(calls)).toEqual({});
+
+    // 21:00：い には担当なしの TODO だけ
+    await runCron(at("21:00"));
+    expect(await s.received(calls)).toEqual({ [b]: [{ title: "今日の TODO", body: "車検の予約", url: "/" }] });
+  });
+
+  it("TODO の時刻があれば、その時刻に送る（家事が1つも無くても）", async () => {
+    const s = await setup();
+    const a = await s.user("あ", "20:00");
+    const fam = await s.family("自宅", [a]);
+    await s.todo(fam, "役所に電話", { notifyTime: "09:00" });
+
+    const calls = mockPushService(() => 201);
+    await runCron(at("20:00"));
+    expect(await s.received(calls)).toEqual({});
+    await runCron(at("09:00"));
+    expect(await s.received(calls)).toEqual({ [a]: [{ title: "今日の TODO", body: "役所に電話", url: "/" }] });
   });
 });

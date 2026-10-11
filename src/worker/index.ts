@@ -10,6 +10,7 @@ import { pushRoutes } from "./push/routes";
 import { shoppingRoutes } from "./shopping/routes";
 import { purgeExpiredSessions } from "./auth/session";
 import { statsRoutes } from "./stats/routes";
+import { todoRoutes } from "./todos/routes";
 import { DAY, isoBefore, nowIso } from "./context";
 import type { AppEnv } from "./context";
 import { getDb } from "./db";
@@ -32,6 +33,7 @@ app.route("/", choreRoutes);
 app.route("/", statsRoutes);
 app.route("/", pushRoutes);
 app.route("/", shoppingRoutes);
+app.route("/", todoRoutes);
 
 app.notFound((c) => c.json({ error: "その API はありません" }, 404));
 app.onError((err, c) => {
@@ -53,7 +55,7 @@ export default {
   fetch: app.fetch,
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(purge(env));
-    // 当日の通知（docs/design.md の 3）。時刻帯は Cron の予定時刻で決める
+    // 当日の通知（家事と TODO。docs/design.md の 3）。時刻帯は Cron の予定時刻で決める
     ctx.waitUntil(sendDueNotifications(env, new Date(controller.scheduledTime)));
   },
 } satisfies ExportedHandler<Env>;

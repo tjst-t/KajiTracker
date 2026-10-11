@@ -1,7 +1,7 @@
-// 当日の通知（Cron から呼ぶ）。DB から読み、plan.ts で決め、送って notifications_sent に入れる。
-import { eq, isNull } from "drizzle-orm";
+// 当日の通知（Cron から呼ぶ）。DB から読み、plan.ts で決め、送って notifications_sent（TODO は todo_notifications_sent）に入れる。
+import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
-import { chores, families, familyMembers, logs, notificationsSent, users } from "../db/schema";
+import { chores, families, familyMembers, logs, notificationsSent, todoNotificationsSent, todos, users } from "../db/schema";
 import { scheduleOf } from "../chores/routes";
 import { todayInTokyo } from "../../shared/date";
 import { type PlanInput, planNotifications } from "./plan";
@@ -11,11 +11,20 @@ export async function loadPlanInput(env: Env, now: Date): Promise<PlanInput> {
   const db = getDb(env.DB);
   const today = todayInTokyo(now);
   // 並びは登録順（まとめた本文の順になる）
-  const choreRows = await db.select().from(chores).where(isNull(chores.archivedAt)).orderBy(chores.createdAt, chores.id).all();
-  const familyIds = [...new Set(choreRows.map((c) => c.familyId))];
-  if (familyIds.length === 0) return { families: [], members: [], chores: [], sent: [] };
+  const [choreRows, todoRows] = await Promise.all([
+    db.select().from(chores).where(isNull(chores.archivedAt)).orderBy(chores.createdAt, chores.id).all(),
+    // TODO は期限が今日で未完了のものだけ読む（並びは一覧と同じ）
+    db
+      .select()
+      .from(todos)
+      .where(and(eq(todos.dueOn, today), isNull(todos.doneAt)))
+      .orderBy(todos.sortOrder, todos.createdAt, todos.id)
+      .all(),
+  ]);
+  const familyIds = new Set([...choreRows, ...todoRows].map((c) => c.familyId));
+  if (familyIds.size === 0) return { families: [], members: [], chores: [], todos: [], sent: [], sentTodos: [] };
 
-  const [familyRows, memberRows, logRows, sentRows] = await Promise.all([
+  const [familyRows, memberRows, logRows, sentRows, sentTodoRows] = await Promise.all([
     db.select({ id: families.id, name: families.name }).from(families).all(),
     db
       .select({ familyId: familyMembers.familyId, userId: familyMembers.userId, notifyTime: users.notifyTime })
@@ -26,6 +35,10 @@ export async function loadPlanInput(env: Env, now: Date): Promise<PlanInput> {
     db.select({ userId: notificationsSent.userId, choreId: notificationsSent.choreId, dueOn: notificationsSent.dueOn })
       .from(notificationsSent)
       .where(eq(notificationsSent.dueOn, today))
+      .all(),
+    db.select({ userId: todoNotificationsSent.userId, todoId: todoNotificationsSent.todoId, dueOn: todoNotificationsSent.dueOn })
+      .from(todoNotificationsSent)
+      .where(eq(todoNotificationsSent.dueOn, today))
       .all(),
   ]);
 
@@ -52,7 +65,16 @@ export async function loadPlanInput(env: Env, now: Date): Promise<PlanInput> {
       doneOns: doneOns.get(c.id) ?? [],
     });
   }
-  return { families: familyRows, members: memberRows, chores: planChores, sent: sentRows };
+  const planTodos: PlanInput["todos"] = todoRows.map((t) => ({
+    id: t.id,
+    familyId: t.familyId,
+    title: t.title,
+    dueOn: t.dueOn,
+    assigneeUserId: t.assigneeUserId,
+    notifyTime: t.notifyTime,
+    done: !!t.doneAt,
+  }));
+  return { families: familyRows, members: memberRows, chores: planChores, todos: planTodos, sent: sentRows, sentTodos: sentTodoRows };
 }
 
 /**
@@ -64,13 +86,23 @@ export async function sendDueNotifications(env: Env, now: Date = new Date()): Pr
   const plan = planNotifications(await loadPlanInput(env, now), now);
   let count = 0;
   for (const n of plan) {
-    const claimed = await db
-      .insert(notificationsSent)
-      .values(n.items.map((i) => ({ userId: n.userId, ...i })))
-      .onConflictDoNothing()
-      .returning({ choreId: notificationsSent.choreId })
-      .all();
-    if (claimed.length === 0) continue;
+    const claimed = n.items.length
+      ? await db
+          .insert(notificationsSent)
+          .values(n.items.map((i) => ({ userId: n.userId, ...i })))
+          .onConflictDoNothing()
+          .returning({ choreId: notificationsSent.choreId })
+          .all()
+      : [];
+    const claimedTodos = n.todoItems.length
+      ? await db
+          .insert(todoNotificationsSent)
+          .values(n.todoItems.map((i) => ({ userId: n.userId, ...i })))
+          .onConflictDoNothing()
+          .returning({ todoId: todoNotificationsSent.todoId })
+          .all()
+      : [];
+    if (claimed.length === 0 && claimedTodos.length === 0) continue;
     // 一部だけ先に入っていた（重なった実行と競った）ときは、まれなのでそのまま送る
     try {
       await sendPushToUser(env, n.userId, n.payload);

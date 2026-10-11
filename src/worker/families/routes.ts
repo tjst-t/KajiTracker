@@ -6,7 +6,7 @@ import { RP, TICKET_TTL, body, requireStepUp, saveChallenge, takeChallengeRow, v
 import { createSession } from "../auth/session";
 import type { AppEnv, Ctx } from "../context";
 import { DAY, fail, isoAfter, nowIso, requireAuth } from "../context";
-import { choreGroups, chores, families, familyMembers, invites, loginTickets, passkeys, users } from "../db/schema";
+import { choreGroups, chores, families, familyMembers, invites, loginTickets, passkeys, todos, users } from "../db/schema";
 import { rateLimit } from "../guards";
 import { base64urlToBytes, newId, randomToken, sha256Hex } from "../lib/crypto";
 import { insertDefaultShopping } from "../shopping/defaults";
@@ -52,11 +52,12 @@ async function memberCount(c: Ctx, familyId: string) {
   return r?.n ?? 0;
 }
 
-/** Family から1人を外す（抜ける・外す共通）。担当だった家事は「担当なし」に戻す。記録は残す */
+/** Family から1人を外す（抜ける・外す共通）。担当だった家事・TODO は「担当なし」に戻す。記録は残す */
 async function removeMember(c: Ctx, familyId: string, userId: string) {
   const db = c.get("db");
   await db.batch([
     db.update(chores).set({ assigneeUserId: null }).where(and(eq(chores.familyId, familyId), eq(chores.assigneeUserId, userId))),
+    db.update(todos).set({ assigneeUserId: null }).where(and(eq(todos.familyId, familyId), eq(todos.assigneeUserId, userId))),
     db.delete(familyMembers).where(and(eq(familyMembers.familyId, familyId), eq(familyMembers.userId, userId))),
   ]);
 }

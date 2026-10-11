@@ -174,6 +174,26 @@ Family を作ると「キッチン・風呂・トイレ・洗濯・ゴミ捨て�
 **shopping_purchases**（買った記録）：id（品物の id をそのまま使い、二重に記録しない）, list_id, family_id, name, note, section_id（FK NULL）, section_name（売り場を消しても名前を残す）, user_id（カゴに入れた人。いなければ「買い物を終える」を押した人）, bought_at。
 「よく買うもの」は、ここをリストと名前でまとめ、回数の多い順・最後に買った日時の新しい順に並べる。売り場は最後に買ったときのもの。
 
+### TODO
+
+**todos**（一回限りの TODO）
+| 列 | 型 | 説明 |
+|---|---|---|
+| id | text PK | |
+| family_id | text FK | |
+| title | text | 1〜60文字 |
+| memo | text NULL | メモ（Markdown、最大 10000 文字。決まりは chores.howto と同じ） |
+| due_on | date NULL | 期限（日本時間） |
+| assignee_user_id | text FK NULL | 担当。抜けたら NULL に戻す |
+| group_id | text FK NULL | chore_groups。グループを消すと NULL |
+| notify_time | text NULL | 通知の時刻（15分きざみ）。NULL なら人の時刻 |
+| created_by | text FK NULL | 作った人 |
+| done_at / done_by | timestamp NULL / text FK NULL | 済ませた時刻と人。done_at が NULL なら未完了 |
+| sort_order | integer | 並び順（足すと Family の最後に） |
+| created_at / updated_at | timestamp | |
+
+**todo_subtasks**（サブタスク、1段だけ）：id, todo_id（FK、TODO を消すと cascade）, title（1〜60文字）, done_at / done_by（NULL なら未完了）, sort_order, created_at。TODO 1つに50個まで。
+
 ### 通知
 
 **push_subscriptions**
@@ -188,6 +208,8 @@ Family を作ると「キッチン・風呂・トイレ・洗濯・ゴミ捨て�
 送ったときに 404・410 が返ったら消す。
 
 **notifications_sent**：(user_id, chore_id, due_on) を PK にして、同じ期限で二度送らないようにする。
+
+**todo_notifications_sent**：TODO の分。(user_id, todo_id, due_on) を PK にする（考え方は notifications_sent と同じ）。期限を変えれば、新しい期限の日にまた送る。
 
 ## 2. 期限の計算
 
@@ -220,7 +242,9 @@ Family を作ると「キッチン・風呂・トイレ・洗濯・ゴミ捨て�
 - 送る相手：担当者がいれば担当者、いなければ Family 全員。
 - 送る時刻：家事の `notify_time` があればそれ、無ければ相手の `notify_time`。いまの時刻帯に入る人・家事だけ送る。
 - 1人に同じ時刻帯で複数の家事があれば、1通にまとめる（「今日の家事：ゴミ出し・洗濯槽の掃除」）。Family が複数ある人には Family 名をつける（「自宅：ゴミ出し／実家：草むしり」）。担当者がもう Family にいなければ、担当なしと同じに全員へ送る。
-- 送ったら `notifications_sent` に入れる。
+- **TODO**：期限（`due_on`）が今日で未完了のものを、家事と同じ相手・同じ時刻の決まり（TODO の `notify_time` → 相手の `notify_time`）で送る。遅れ・期限なし・済みは送らない。
+- 同じ時刻帯に家事と TODO の両方があれば1通にまとめる。題名は「今日の家事」、本文は「今日の家事：ゴミ出し・洗濯／TODO：役所に電話」（Family が複数ある人は、それぞれの中を「自宅：ゴミ出し、実家：草むしり」のように「、」で区切る）。TODO だけなら題名「今日の TODO」、本文は家事と同じ形。
+- 送ったら `notifications_sent`（TODO は `todo_notifications_sent`）に入れる。決めるのは `push/plan.ts`（純粋な関数）、読み出しと送信は `push/notify.ts`。
 - 通知を押すとアプリのホームを開く。
 
 ## 4. 画面
@@ -336,6 +360,16 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
 - `DELETE /shopping-items/:id`：もう無くても 200（`deleted: false`）
 - `POST /shopping-lists/:id/checkout`（`{ itemIds? }`）：カゴの品物（itemIds があれば、そのうちカゴにあるもの）を買った記録に移してリストから外す。返り値は `{ purchased, names }`。送り直しても二重にならない
 - `GET /shopping-lists/:id/purchases?limit=`（買った記録、新しい順。`{ name, note, sectionName, listName, userName, boughtAt }`）
+
+**TODO**（どれも Family のメンバーだけ。よその Family のものは 404）。実装は `src/worker/todos/routes.ts`
+- `GET /families/:fid/todos?status=open|done&due=today-or-overdue` → `{ today, todos: Todo[] }`
+  - `status=open`（既定）：未完了。期限の近い順、期限なしは後ろ（同じなら sort_order・作った順）
+  - `status=done`：済み。済ませた新しい順に `limit`（既定 100、500 まで）件
+  - `due=today-or-overdue`：未完了で期限が今日か過ぎているものだけ（今日の画面用。`status=open` のときだけ）
+  - `Todo` は `{ id, familyId, title, memo, hasMemo, dueOn, dueStatus: "overdue"|"today"|"upcoming"|null, daysLate, assigneeUserId, assigneeName, groupId, groupName, notifyTime, createdByName, done, doneAt, doneByName, sortOrder, createdAt, updatedAt, subtasks: [{ id, todoId, title, done, doneAt, doneByName, sortOrder }], progress: { done, total } }`。dueStatus は済み・期限なしなら null
+- `POST /families/:fid/todos`（`{ title, memo?, dueOn?, assigneeUserId?, groupId?, notifyTime?, subtasks?: string[] }`）→ 201 で Todo
+- `GET /todos/:id`、`PATCH /todos/:id`（`title・memo・dueOn・assigneeUserId・groupId・notifyTime・sortOrder・done`。来なかった項目は変えない。`done: true` で済ませた人と時刻を記録（もう済んでいれば変えない）、`false` で取り消し。サブタスクは変えない）→ Todo、`DELETE /todos/:id`（サブタスクも消える）
+- `POST /todos/:id/subtasks`（`{ title }`。最後に足す）、`PATCH /subtasks/:id`（`title・done・sortOrder`。全部済んでも親は済みにしない）、`DELETE /subtasks/:id`。サブタスクの下に足す口は無い
 
 **通知**
 - `GET /push/vapid-public-key`
