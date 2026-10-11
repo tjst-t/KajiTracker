@@ -681,7 +681,7 @@
       "number": 30,
       "kind": "task",
       "title": "買い物リストを電波の弱い店でも使えるようにする",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [
         "shopping-lists"
@@ -695,7 +695,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-11T13:33:26.335Z",
-      "updatedAt": "2026-10-11T13:33:26.335Z",
+      "updatedAt": "2026-10-11T14:34:50.393Z",
       "closedAt": null,
       "extra": {}
     },
