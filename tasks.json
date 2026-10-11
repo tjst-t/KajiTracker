@@ -657,7 +657,7 @@
       "number": 29,
       "kind": "task",
       "title": "買い物リスト（お店ごと・売り場で分ける・よく買うものからワンタップ）",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [
         "chore-howto",
@@ -672,7 +672,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-11T13:33:24.284Z",
-      "updatedAt": "2026-10-11T13:33:24.284Z",
+      "updatedAt": "2026-10-11T14:05:40.236Z",
       "closedAt": null,
       "extra": {}
     },
