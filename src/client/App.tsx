@@ -11,6 +11,7 @@ import { SoonScreen } from "./screens/Soon";
 import { Login } from "./screens/Login";
 import { Settings } from "./screens/Settings";
 import { Shopping } from "./screens/Shopping";
+import { markOffline, startShoppingSync } from "./shopping-store";
 import { StatsScreen } from "./screens/Stats";
 import { ChoreDetail } from "./screens/ChoreDetail";
 import { ChoreForm } from "./screens/ChoreForm";
@@ -33,6 +34,25 @@ const TABS: [Tab, string][] = [
 ];
 
 const FAMILY_KEY = "kaji.currentFamily";
+/** 最後に読めた自分と Family。電波が無いときは、これで画面を出す（買い物を端末のデータで見られるように） */
+const OFFLINE_KEY = "kaji.offlineMe";
+
+type OfflineMe = { me: Me; families: Family[] };
+
+function offlineMe(): OfflineMe | null {
+  try {
+    return JSON.parse(localStorage.getItem(OFFLINE_KEY) ?? "null") as OfflineMe | null;
+  } catch {
+    return null;
+  }
+}
+
+/** fetch そのものが落ちた（サーバの返事が無い） */
+const unreachable = (e: unknown) => !(e instanceof ApiError);
+
+// 前にログインしていた人の買い物の送る待ちを読んでおく（ログインし直すと送る、を出すため）
+const startedOffline = offlineMe();
+if (startedOffline) void startShoppingSync(startedOffline.me.user.id);
 
 export function App() {
   const [ticket, setTicket] = useState(initialFragment?.kind === "login" ? initialFragment.token : null);
@@ -55,6 +75,8 @@ export function App() {
   const loadFamilies = useCallback(async (select?: string) => {
     const list = await api<Family[]>("GET", "/families");
     setFamilies(list);
+    const saved = offlineMe();
+    if (saved) localStorage.setItem(OFFLINE_KEY, JSON.stringify({ ...saved, families: list }));
     setCurrentId((cur) => {
       const want = select ?? cur;
       const next = list.find((f) => f.id === want)?.id ?? list[0]?.id ?? null;
@@ -67,13 +89,23 @@ export function App() {
   const refreshMe = useCallback(async () => {
     try {
       const m = await api<Me>("GET", "/me");
+      localStorage.setItem(OFFLINE_KEY, JSON.stringify({ me: m, families: offlineMe()?.families ?? [] }));
       setMe(m);
+      void startShoppingSync(m.user.id);
       await loadFamilies();
       setLoadError(null);
     } catch (e) {
+      const saved = offlineMe();
       if (e instanceof ApiError && e.status === 401) {
+        localStorage.removeItem(OFFLINE_KEY);
         setMe(null);
         setFamilies(undefined);
+      } else if (unreachable(e) && saved && saved.families.length > 0) {
+        // 電波が無い：最後に読めた中身で出し、つながったら読み直す
+        markOffline();
+        setMe((cur) => cur ?? saved.me);
+        setFamilies((cur) => cur ?? saved.families);
+        addEventListener("online", () => void refreshMe(), { once: true });
       } else setLoadError(errorText(e));
     }
   }, [loadFamilies]);
@@ -179,7 +211,15 @@ export function App() {
         </nav>
       </header>
       {route.name === "settings" || !family ? (
-        <Settings me={me} nav={family ? nav : undefined} onChanged={refreshMe} onLoggedOut={() => setMe(null)} />
+        <Settings
+          me={me}
+          nav={family ? nav : undefined}
+          onChanged={refreshMe}
+          onLoggedOut={() => {
+            localStorage.removeItem(OFFLINE_KEY);
+            setMe(null);
+          }}
+        />
       ) : route.name === "family" ? (
         <FamilyScreen me={me} family={family} nav={nav} onFamiliesChanged={loadFamilies} />
       ) : route.name === "stats" ? (
@@ -189,7 +229,7 @@ export function App() {
       ) : route.name === "todos" ? (
         <SoonScreen title="TODO" />
       ) : route.name === "shopping" ? (
-        <Shopping key={family.id} me={me} family={family} />
+        <Shopping key={family.id} me={me} family={family} onAuthLost={() => void refreshMe()} />
       ) : route.name === "chores" ? (
         <Chores family={family} nav={nav} />
       ) : route.name === "chore-table" ? (

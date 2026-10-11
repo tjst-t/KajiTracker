@@ -1,7 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ApiError, type Family, type Me, api } from "../api";
 import { errorText } from "../format";
-import { type FrequentItem, type ShoppingItem, type ShoppingListSummary, type ShoppingListView, newItemId } from "../shopping";
+import { type FrequentItem, type ShoppingItem, type ShoppingListSummary, type ShoppingListView, type ShoppingOp, applyOps, newItemId } from "../shopping";
+import {
+  type SyncState,
+  cachedView,
+  clearDropped,
+  flushShopping,
+  getSyncState,
+  opsToApply,
+  markAuthLost,
+  markOffline,
+  markOnline,
+  pushOp,
+  saveView,
+  subscribeSync,
+} from "../shopping-store";
 
 /** 画面を開いている間、読み直す間隔（画面が見えているときだけ） */
 const POLL_MS = 5000;
@@ -11,58 +25,120 @@ const NONE = "__none__";
 
 const listKey = (familyId: string) => `kaji.shoppingList.${familyId}`;
 
-/** 買い物メモ。お店ごとのリストを切り替え、売り場ごとに品物を並べる。タップでカゴに入れ、「買い物を終える」で履歴へ */
-export function Shopping({ me, family }: { me: Me; family: Family }) {
+/**
+ * 買い物メモ。お店ごとのリストを切り替え、売り場ごとに品物を並べる。タップでカゴに入れ、「買い物を終える」で履歴へ。
+ * 端末に持った中身（shopping-store）でまず描き、つながっていれば読み直す。変更は端末に積んでから送る
+ */
+export function Shopping({ me, family, onAuthLost }: { me: Me; family: Family; onAuthLost: () => void }) {
   const [listId, setListId] = useState<string | null>(() => localStorage.getItem(listKey(family.id)));
-  const [data, setData] = useState<ShoppingListView | null>(null);
+  /** 最後にサーバから読めた中身（端末に持っていたものを含む）と、読み始めたときの sent */
+  const [server, setServer] = useState<{ view: ShoppingListView; readAt: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  // 書き込みの途中・直後に、古い読み直しの結果で画面を戻さないように
-  const pending = useRef(0);
+  const sync = useSyncExternalStore(subscribeSync, getSyncState);
+  // 画面に出すのは、読めた中身に、そのあと送れた変更とまだ送っていない変更を重ねたもの
+  const data = useMemo(() => (server && sync.ready ? applyOps(server.view, opsToApply(sync, server.readAt)) : null), [server, sync]);
+  // リストを切り替えたら、前のリストの読み直しの結果を捨てる
   const gen = useRef(0);
+  // 読み直しは、あとから始めたものの結果だけ使う（遅れて返った古い結果で戻さない）
+  const reads = useRef(0);
+  const applied = useRef(0);
+  /** いま出しているリストの id */
+  const shown = useRef<string | null>(null);
+  shown.current = server?.view.list.id ?? null;
+  const prefetched = useRef(false);
 
   const choose = (id: string) => {
-    gen.current++; // 前のリストの読み直しの結果を捨てる
+    gen.current++;
     localStorage.setItem(listKey(family.id), id);
     setListId(id);
     setMessage(null);
+    setError(null);
   };
 
-  const load = useCallback(async () => {
-    const g = gen.current;
-    try {
-      let id = listId;
-      if (!id) {
-        const lists = await api<ShoppingListSummary[]>("GET", `/families/${family.id}/shopping-lists`);
-        if (lists.length === 0) {
-          if (g === gen.current) setData({ list: { id: "", familyId: family.id, name: "" }, lists: [], sections: [], items: [], frequent: [] });
+  /** 選んだリストを読めず、端末にも無い：前のリストを出したままにしない */
+  const notShown = (why: string) => {
+    setServer(null);
+    setError(why);
+  };
+
+  /** 読み直す。first なら、先に端末に持っている中身で描く */
+  const load = useCallback(
+    async (first = false) => {
+      const g = gen.current;
+      const read = ++reads.current;
+      const readAt = getSyncState().sent;
+      try {
+        let id = listId;
+        if (!id) {
+          const lists = await api<ShoppingListSummary[]>("GET", `/families/${family.id}/shopping-lists`);
+          if (lists.length === 0) {
+            if (g === gen.current)
+              setServer({ view: { list: { id: "", familyId: family.id, name: "" }, lists: [], sections: [], items: [], frequent: [] }, readAt });
+            return;
+          }
+          id = lists[0]!.id;
+          localStorage.setItem(listKey(family.id), id);
+          setListId(id);
+          return; // listId が変われば読み直す
+        }
+        if (first) {
+          const cached = await cachedView(id);
+          if (g !== gen.current) return;
+          if (cached && cached.view.list.familyId === family.id) {
+            setServer(cached);
+            shown.current = id;
+          }
+        }
+        const v = await api<ShoppingListView>("GET", `/shopping-lists/${id}`);
+        // Family を切り替えたあとに前の Family のリストが残っていたら選び直す
+        if (v.list.familyId !== family.id) throw new ApiError(404, "", "list_not_found");
+        markOnline();
+        if (getSyncState().ops.length > 0) void flushShopping();
+        if (g !== gen.current || read < applied.current) return;
+        applied.current = read;
+        void saveView(v, readAt);
+        setServer({ view: v, readAt });
+        setError(null);
+        if (!prefetched.current) {
+          // ほかのお店のリストも端末に入れておく（売り場で電波が切れても開けるように）
+          prefetched.current = true;
+          void (async () => {
+            for (const l of v.lists.filter((l) => l.id !== v.list.id)) {
+              const at = getSyncState().sent;
+              const other = await api<ShoppingListView>("GET", `/shopping-lists/${l.id}`).catch(() => null);
+              if (other) await saveView(other, at);
+            }
+          })();
+        }
+      } catch (e) {
+        if (g !== gen.current) return;
+        if (e instanceof ApiError && e.code === "list_not_found") {
+          localStorage.removeItem(listKey(family.id));
+          setListId(null);
           return;
         }
-        id = lists[0]!.id;
-        localStorage.setItem(listKey(family.id), id);
-        setListId(id);
-        return; // listId が変われば読み直す
+        if (e instanceof ApiError && e.status === 401) {
+          markAuthLost();
+          if (shown.current !== listId) notShown("ログインが切れています。ログインし直してください");
+          return;
+        }
+        if (!(e instanceof ApiError)) {
+          // 電波が無い：端末に持っている中身のまま（無ければそう知らせる）
+          markOffline();
+          if (shown.current !== listId) notShown("電波がありません。このリストはまだこの端末に入っていません。つながる場所で一度開いてください");
+          return;
+        }
+        setError(errorText(e));
       }
-      const v = await api<ShoppingListView>("GET", `/shopping-lists/${id}`);
-      if (g !== gen.current || pending.current > 0) return;
-      // Family を切り替えたあとに前の Family のリストが残っていたら選び直す
-      if (v.list.familyId !== family.id) throw new ApiError(404, "", "list_not_found");
-      setData(v);
-      setError(null);
-    } catch (e) {
-      if (e instanceof ApiError && e.code === "list_not_found") {
-        localStorage.removeItem(listKey(family.id));
-        setListId(null);
-        return;
-      }
-      if (g === gen.current) setError(errorText(e));
-    }
-  }, [family.id, listId]);
+    },
+    [family.id, listId],
+  );
 
   useEffect(() => {
-    void load();
+    void load(true);
     const tick = () => {
-      if (document.visibilityState === "visible" && pending.current === 0) void load();
+      if (document.visibilityState === "visible") void load();
     };
     const timer = setInterval(tick, POLL_MS);
     document.addEventListener("visibilitychange", tick);
@@ -72,21 +148,16 @@ export function Shopping({ me, family }: { me: Me; family: Family }) {
     };
   }, [load]);
 
-  /** 画面を先に変えてから送る。終わったら読み直す（失敗したら知らせて読み直す） */
-  const mutate = async (local: (d: ShoppingListView) => ShoppingListView, send: () => Promise<unknown>) => {
-    gen.current++;
-    pending.current++;
-    setData((d) => (d ? local(d) : d));
+  // 送る待ちを送り終えたら読み直す（ほかの人の変更と、送った結果を合わせる）
+  const queued = sync.ops.length;
+  useEffect(() => {
+    if (sync.sent > 0 && queued === 0) void load();
+  }, [sync.sent, queued, load]);
+
+  /** 変更を端末に積む（画面にはすぐ出て、送れたら消える） */
+  const change = (op: ShoppingOp) => {
     setError(null);
-    try {
-      await send();
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      pending.current--;
-      gen.current++;
-      if (pending.current === 0) void load();
-    }
+    return pushOp(op);
   };
 
   const addItem = (name: string, note: string, sectionId: string | null) => {
@@ -103,43 +174,45 @@ export function Shopping({ me, family }: { me: Me; family: Family }) {
       updatedAt: new Date().toISOString(),
     };
     setMessage(null);
-    return mutate(
-      (d) => ({ ...d, items: [...d.items, item], frequent: d.frequent.filter((f) => f.name !== name) }),
-      () => api("POST", `/shopping-lists/${item.listId}/items`, { id: item.id, name, note, sectionId }),
-    );
+    return change({ kind: "add", listId: item.listId, item });
   };
 
-  const toggle = (item: ShoppingItem) => {
-    const status = item.status === "open" ? "in_cart" : "open";
-    const cartByName = status === "in_cart" ? me.user.displayName : null;
-    return mutate(
-      (d) => ({ ...d, items: d.items.map((i) => (i.id === item.id ? { ...i, status, cartByName } : i)) }),
-      () => api("PATCH", `/shopping-items/${item.id}`, { status }),
-    );
-  };
+  const toggle = (item: ShoppingItem) =>
+    change({
+      kind: "update",
+      listId: item.listId,
+      itemId: item.id,
+      status: item.status === "open" ? "in_cart" : "open",
+      by: me.user.displayName,
+    });
 
-  const remove = (item: ShoppingItem) =>
-    mutate(
-      (d) => ({ ...d, items: d.items.filter((i) => i.id !== item.id) }),
-      () => api("DELETE", `/shopping-items/${item.id}`),
-    );
+  const setNote = (item: ShoppingItem, note: string) =>
+    change({
+      kind: "update",
+      listId: item.listId,
+      itemId: item.id,
+      note: note.trim() || null,
+      by: me.user.displayName,
+    });
+
+  const remove = (item: ShoppingItem) => change({ kind: "remove", listId: item.listId, itemId: item.id });
 
   const checkout = () => {
     const ids = data!.items.filter((i) => i.status === "in_cart").map((i) => i.id);
-    const listId = data!.list.id;
-    return mutate(
-      (d) => ({ ...d, items: d.items.filter((i) => !ids.includes(i.id)) }),
-      async () => {
-        const r = await api<{ purchased: number }>("POST", `/shopping-lists/${listId}/checkout`, { itemIds: ids });
-        setMessage(`${r.purchased}点を買いました。また要るときは「よく買うもの」から入れられます。`);
-      },
-    );
+    setMessage(`${ids.length}点を買いました。また要るときは「よく買うもの」から入れられます。`);
+    return change({
+      kind: "checkout",
+      listId: data!.list.id,
+      itemIds: ids,
+      at: new Date().toISOString(),
+    });
   };
 
   if (!data)
     return (
       <main className="page">
         <h1>買い物</h1>
+        <SyncBanner sync={sync} onRelogin={onAuthLost} />
         {error ? (
           <p className="error" role="alert">
             {error}
@@ -156,6 +229,7 @@ export function Shopping({ me, family }: { me: Me; family: Family }) {
   return (
     <main className="page shop">
       <h1 className="visually-hidden">買い物</h1>
+      <SyncBanner sync={sync} onRelogin={onAuthLost} />
       <div className="shop-lists" role="tablist" aria-label="お店">
         {data.lists.map((l) => {
           const n = l.openCount + l.cartCount;
@@ -182,7 +256,7 @@ export function Shopping({ me, family }: { me: Me; family: Family }) {
       {hasList ? (
         <>
           <AddForm key={data.list.id} view={data} onAdd={addItem} />
-          <ItemSections view={data} onToggle={(i) => void toggle(i)} onRemove={(i) => void remove(i)} />
+          <ItemSections view={data} onToggle={(i) => void toggle(i)} onNote={(i, n) => void setNote(i, n)} onRemove={(i) => void remove(i)} />
           <div className="shop-checkout">
             <button className="btn btn--primary btn--large" disabled={inCart.length === 0} onClick={() => void checkout()}>
               買い物を終える（{inCart.length}点）
@@ -195,6 +269,36 @@ export function Shopping({ me, family }: { me: Me; family: Family }) {
 
       <ShoppingEditor familyId={family.id} view={data} onChanged={load} onCreated={choose} />
     </main>
+  );
+}
+
+/** 電波が無い・ログインが切れたときに、上に小さく出す。送れたら消える */
+function SyncBanner({ sync, onRelogin }: { sync: SyncState; onRelogin: () => void }) {
+  const n = sync.ops.length;
+  const unsent = n > 0 ? `（未送信 ${n} 件）` : "";
+  return (
+    <>
+      {sync.authLost ? (
+        <div className="sync-banner sync-banner--auth" role="alert">
+          <p>ログインが切れています。ログインし直すと送ります{`${unsent}。`}この端末のデータは消えません。</p>
+          <button className="btn btn--small" onClick={onRelogin}>
+            ログインし直す
+          </button>
+        </div>
+      ) : sync.offline ? (
+        <div className="sync-banner" role="status">
+          <p>電波がありません。この端末に保存して、つながったら送ります{unsent}</p>
+        </div>
+      ) : null}
+      {sync.dropped && (
+        <div className="sync-banner sync-banner--dropped" role="alert">
+          <p>送れなかった変更を取り消しました：{sync.dropped}</p>
+          <button className="btn btn--small" onClick={clearDropped}>
+            閉じる
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -299,7 +403,18 @@ function AddForm({ view, onAdd }: { view: ShoppingListView; onAdd: (name: string
 }
 
 /** 売り場ごとの見出しで品物を並べる。カゴに入れたものはその売り場の下に薄く */
-function ItemSections({ view, onToggle, onRemove }: { view: ShoppingListView; onToggle: (i: ShoppingItem) => void; onRemove: (i: ShoppingItem) => void }) {
+function ItemSections({
+  view,
+  onToggle,
+  onNote,
+  onRemove,
+}: {
+  view: ShoppingListView;
+  onToggle: (i: ShoppingItem) => void;
+  onNote: (i: ShoppingItem, note: string) => void;
+  onRemove: (i: ShoppingItem) => void;
+}) {
+  const [editing, setEditing] = useState<{ id: string; note: string } | null>(null);
   if (view.items.length === 0) return <p className="shop-empty">このリストは空です。上の欄か「よく買うもの」から足してください。</p>;
   const groups = [...view.sections.map((s) => ({ key: s.id, name: s.name })), { key: NONE, name: "売り場なし" }]
     .map((g) => {
@@ -318,17 +433,49 @@ function ItemSections({ view, onToggle, onRemove }: { view: ShoppingListView; on
           <ul className="memo__items">
             {g.items.map((i) => (
               <li key={i.id} className={`memo__item${i.status === "in_cart" ? " is-in-cart" : ""}`}>
-                <button className="memo__toggle" aria-pressed={i.status === "in_cart"} onClick={() => onToggle(i)}>
-                  <span className="memo__check" aria-hidden="true" />
-                  <span className="memo__text">
+                {editing?.id === i.id ? (
+                  <form
+                    className="memo__edit-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (editing.note.trim() !== (i.note ?? "")) onNote(i, editing.note);
+                      setEditing(null);
+                    }}
+                  >
                     <span className="memo__name">{i.name}</span>
-                    {i.note && <span className="memo__note">{i.note}</span>}
-                  </span>
-                  <span className="memo__who">{i.status === "in_cart" ? `カゴ ${i.cartByName ?? ""}` : (i.addedByName ?? "")}</span>
-                </button>
-                <button className="memo__remove" aria-label={`「${i.name}」を消す`} onClick={() => onRemove(i)}>
-                  ×
-                </button>
+                    <input
+                      autoFocus
+                      value={editing.note}
+                      maxLength={40}
+                      placeholder="例：2パック"
+                      aria-label={`「${i.name}」の数量やメモ`}
+                      onChange={(e) => setEditing({ id: i.id, note: e.target.value })}
+                    />
+                    <button className="btn btn--small" type="submit">
+                      決める
+                    </button>
+                    <button className="btn btn--small" type="button" onClick={() => setEditing(null)}>
+                      やめる
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <button className="memo__toggle" aria-pressed={i.status === "in_cart"} onClick={() => onToggle(i)}>
+                      <span className="memo__check" aria-hidden="true" />
+                      <span className="memo__text">
+                        <span className="memo__name">{i.name}</span>
+                        {i.note && <span className="memo__note">{i.note}</span>}
+                      </span>
+                      <span className="memo__who">{i.status === "in_cart" ? `カゴ ${i.cartByName ?? ""}` : (i.addedByName ?? "")}</span>
+                    </button>
+                    <button className="memo__edit" aria-label={`「${i.name}」の数量やメモを直す`} onClick={() => setEditing({ id: i.id, note: i.note ?? "" })}>
+                      ✎
+                    </button>
+                    <button className="memo__remove" aria-label={`「${i.name}」を消す`} onClick={() => onRemove(i)}>
+                      ×
+                    </button>
+                  </>
+                )}
               </li>
             ))}
           </ul>
@@ -353,7 +500,10 @@ function ShoppingEditor({
   onCreated: (listId: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    kind: "ok" | "error";
+    text: string;
+  } | null>(null);
 
   /** うまくいけば true */
   const run = async (fn: () => Promise<unknown>, done: string) => {
@@ -408,12 +558,32 @@ function ShoppingEditor({
             busy={busy}
             placeholder="例：お惣菜"
             onRename={(id, name) => run(() => api("PATCH", `/shopping-sections/${id}`, { name }), "名前を変えました")}
-            onReorder={(ids) => run(() => Promise.all(ids.map((id, k) => api("PATCH", `/shopping-sections/${id}`, { sortOrder: k }))), "並べ替えました")}
+            onReorder={(ids) =>
+              run(
+                () =>
+                  Promise.all(
+                    ids.map((id, k) =>
+                      api("PATCH", `/shopping-sections/${id}`, {
+                        sortOrder: k,
+                      }),
+                    ),
+                  ),
+                "並べ替えました",
+              )
+            }
             onDelete={(s) =>
               confirm(`売り場「${s.name}」を消しますか？ 入っている品物は消えず、売り場なしになります。`) &&
               run(() => api("DELETE", `/shopping-sections/${s.id}`), `「${s.name}」を消しました`)
             }
-            onAdd={(name) => run(() => api("POST", `/shopping-lists/${view.list.id}/sections`, { name }), "売り場を足しました")}
+            onAdd={(name) =>
+              run(
+                () =>
+                  api("POST", `/shopping-lists/${view.list.id}/sections`, {
+                    name,
+                  }),
+                "売り場を足しました",
+              )
+            }
           />
         </>
       )}

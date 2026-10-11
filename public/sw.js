@@ -6,6 +6,8 @@
 // - /assets/*（ファイル名にハッシュが付く）：キャッシュ優先
 // - /api/*：キャッシュしない（ログインや家事のデータを古いまま見せない）
 // - CACHE_VERSION を上げると、activate で古いキャッシュを消す
+// - キャッシュから引くときは Vary を見ない（配るときに Vary: Origin が付き、install で入れたものと
+//   画面の module script の要求とで Origin が食い違って、オフラインで当たらなくなるため。どれも URL だけで決まる）
 // 開発サーバ（vite）では src/client/push.ts が "/sw.js?dev" で登録する。そのときはキャッシュを使わない。
 
 const CACHE_VERSION = "v1";
@@ -78,7 +80,7 @@ async function navigate(request) {
     }
     return res;
   } catch (e) {
-    const cached = await caches.match(SHELL_URL, { cacheName: SHELL_CACHE });
+    const cached = await caches.match(SHELL_URL, { cacheName: SHELL_CACHE, ignoreVary: true });
     if (cached) return cached;
     throw e;
   }
@@ -86,7 +88,7 @@ async function navigate(request) {
 
 /** キャッシュ優先。無ければ取ってきて入れる */
 async function cacheFirst(request, cacheName) {
-  const cached = await caches.match(request, { cacheName });
+  const cached = await caches.match(request, { cacheName, ignoreVary: true });
   if (cached) return cached;
   const res = await fetch(request);
   if (res.ok) {
@@ -106,7 +108,7 @@ async function networkFirst(request, cacheName) {
     }
     return res;
   } catch (e) {
-    const cached = await caches.match(request, { cacheName });
+    const cached = await caches.match(request, { cacheName, ignoreVary: true });
     if (cached) return cached;
     throw e;
   }

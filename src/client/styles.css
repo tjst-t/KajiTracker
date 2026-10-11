@@ -2143,6 +2143,32 @@ select {
 .memo__remove:hover {
   color: var(--danger);
 }
+.memo__edit {
+  font: inherit;
+  flex: none;
+  width: 2.25rem;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.memo__edit:hover {
+  color: var(--ai);
+}
+/* 数量・メモを直す：その行の中で */
+.memo__edit-form {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+}
+.memo__edit-form input {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
 /* カゴに入れた：薄く、取り消し線。印は若竹の丸に白いチェック */
 .memo__item.is-in-cart .memo__text {
   opacity: 0.5;
@@ -2188,6 +2214,26 @@ select {
   .shop-checkout {
     bottom: calc(4.5rem + env(safe-area-inset-bottom));
   }
+}
+/* 電波が無い・ログインが切れた：上に小さく。送れたら消える */
+.sync-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 4px solid var(--shu);
+  background: var(--shu-tint);
+  font-size: var(--t-small);
+}
+.sync-banner p {
+  margin: 0;
+  flex: 1 1 14rem;
+}
+.sync-banner--auth,
+.sync-banner--dropped {
+  border-left-color: var(--danger);
 }
 .shop-editor__title {
   font-size: var(--t-body);

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { fetchLoginOptions, loginWithPasskey, usePrepared } from "../auth";
 import { errorText } from "../format";
+import { getSyncState, subscribeSync } from "../shopping-store";
 
 /** S9 ログイン。新規登録の入口は置かない（招待の QR からだけ） */
 export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
@@ -8,6 +9,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [error, setError] = useState<string | null>(null);
   // options は画面を出したときに取っておき、押したらすぐパスキーを出す（Safari は押してから通信を待つと断る）
   const prepared = usePrepared(true, fetchLoginOptions);
+  const unsent = useSyncExternalStore(subscribeSync, getSyncState).ops.length;
 
   const login = async () => {
     setBusy(true);
@@ -28,6 +30,11 @@ export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
       <p className="lede">
         家事の<span className="nobr">「前にやった日」</span>と<span className="nobr">「次にやる日」</span>を、家族で覚えておく。
       </p>
+      {unsent > 0 && (
+        <p className="notice" role="status">
+          この端末に、まだ送っていない買い物の変更が {unsent} 件あります。ログインし直すと送ります。
+        </p>
+      )}
       <button className="btn btn--primary btn--large" onClick={login} disabled={busy || !prepared.ready}>
         {busy ? "確認しています…" : prepared.ready ? "パスキーでログイン" : "用意しています…"}
       </button>
