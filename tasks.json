@@ -630,6 +630,27 @@
       "updatedAt": "2026-10-11T13:32:17.993Z",
       "closedAt": null,
       "extra": {}
+    },
+    {
+      "id": "tabs-restructure",
+      "number": 28,
+      "kind": "task",
+      "title": "タブを「今日・TODO・買い物・家事・その他」にする",
+      "status": "ready",
+      "parent": null,
+      "dependsOn": [],
+      "milestone": null,
+      "priority": "normal",
+      "labels": [],
+      "body": "## 背景\nたくみさんの決定（2026-10-11）。TODO と買い物リストを足すので、タブを「今日・TODO・買い物・家事・その他」にする（家事は実質設定に近いので4番目）。「その他」の中に統計・家族・設定。タブは src/client/App.tsx の TABS、URL は src/client/router.ts（tabOf・pathOf・routeOf）。スマホでは画面下に固定、PC ではヘッダー右。\n\n## やること\n- router に /todos（TODO の一覧）と /shopping（買い物）と /more（その他）を足す。TODO と買い物の画面は、この時点では「準備中です」の空の画面でよい（後のタスクで作る）。\n- 「その他」の画面：統計・家族・設定への入口を並べる（見出しと説明1行ずつの行。押すとそれぞれの画面）。統計・家族・設定の画面を開いているときは、タブは「その他」が選ばれた状態にする。各画面の上に「その他」へ戻るリンク。\n- URL は今までの /stats・/family・/settings をそのまま使う（ブックマークや通知の url が壊れないように）。\n- スマホ幅（390px）で5つのタブが1行に収まり、押しやすい大きさ（44px 以上）。PC 幅でも崩れない。\n- e2e の各ファイルで、タブの名前や順番に頼っているところ（「統計」「家族」「設定」のボタンを押す等）を「その他」経由に直す。\n\n## 確かめ方\n- e2e（stats-flow のタブの確認を直し、新しい並びを確かめる。他の e2e も通す）。スクリーンショットで 390px と 1280px の見た目を確かめる。\n- npx tsc -b・npm run build・npm test。ローカルの D1 を消さない。",
+      "doneWhen": "タブが「今日・TODO・買い物・家事・その他」になり、その他から統計・家族・設定へ行け、既存の URL が使え、390px で1行に収まる。全部の e2e と tsc・build・test が通る",
+      "resolution": null,
+      "refs": [],
+      "threads": [],
+      "createdAt": "2026-10-11T13:32:20.325Z",
+      "updatedAt": "2026-10-11T13:32:20.325Z",
+      "closedAt": null,
+      "extra": {}
     }
   ]
 }
