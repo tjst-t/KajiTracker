@@ -704,7 +704,7 @@
       "number": 31,
       "kind": "task",
       "title": "一回限りの TODO（サブタスク1段）：テーブルと API・通知",
-      "status": "in-progress",
+      "status": "done",
       "parent": null,
       "dependsOn": [
         "shopping-lists"
@@ -714,12 +714,12 @@
       "labels": [],
       "body": "## 背景\nたくみさんの要望（2026-10-11）。家事（くり返し）とは別に、一回限りの TODO を家族で管理する。サブタスクは1段。統計の分担には入れない。家事の API・認可・通知の書き方に合わせる（src/worker/chores/routes.ts、src/worker/families/routes.ts の requireMember、通知は src/worker/push/plan.ts・send.ts と src/worker/index.ts の scheduled）。マイグレーションは shopping-lists のあとに作る（番号がぶつからないように）。\n\n## 決まり\n- **TODO**：Family・題名（1〜60文字）・メモ（Markdown、最大10000文字。chore-howto と同じ表示の決まり）・期限（任意、日本時間の日付）・担当（任意、Family のメンバー）・グループ（任意、家事と同じ chore_groups）・通知の時刻（任意、15分きざみ。無ければ人ごとの時刻）・作った人・済んだ時刻（null で未完了）・済ませた人・並び順。\n- **サブタスク**：TODO の下に1段だけ。題名（1〜60文字）・済んだかどうか・並び順。サブタスクのサブタスクは作れない。\n- サブタスクを全部済ませても、親は自動では済みにしない（親は人が「済み」にする）。親を済みにしても、残ったサブタスクはそのまま（画面で「残りもまとめて済みにしますか」と聞くのは画面のタスク）。\n- 済みは取り消せる。済んだ TODO は消さずに残る（一覧で「済み」を見返せる）。削除もできる（サブタスクも消える）。\n- **通知**：期限が今日の未完了の TODO を、家事と同じ仕組み・同じ時刻の決まり（TODO の通知時刻があればそれ、無ければ相手の時刻）・同じ相手の決まり（担当がいれば担当、いなければ全員）で送る。同じ時刻帯の家事と TODO は1通にまとめる（「今日の家事：…／TODO：…」）。二度送らない記録は notifications_sent と同じ考えで（TODO 用に列か表を足す）。遅れている TODO には送らない（家事と同じ）。\n- **統計**：TODO は分担・守り具合に入れない（src/shared/stats.ts は触らない）。\n- API（src/worker/todos/routes.ts、index.ts に足す）：GET /families/:fid/todos?status=open|done（open は期限の近い順・期限なしは後ろ、サブタスクと進み具合つき）・POST・GET /todos/:id・PATCH /todos/:id（done: true/false も）・DELETE、サブタスクの POST /todos/:id/subtasks・PATCH /subtasks/:id（title・done・並び順）・DELETE。今日の画面用に、GET /families/:fid/todos?due=today-or-overdue を返せること（または一覧の結果を画面で絞れる形）。\n- docs/spec.md・docs/design.md に追記。\n\n## 確かめ方\n- API のテスト：CRUD・他の Family から触れない・サブタスクは1段まで・済みと取り消し・済ませた人の記録・並び・削除でサブタスクも消える。通知の計画のテスト（src/worker/push/plan.test.ts に足す）：期限が今日の TODO が担当（いなければ全員）に、時刻の決まりどおり、家事と1通にまとまり、二度送らない、遅れ・済みは送らない。\n- npx tsc -b・npm run build・npm test。既存の e2e も通る（画面は次のタスク）。ローカルの D1 を消さない。",
       "doneWhen": "TODO とサブタスク（1段）の API があり、期限当日の通知が家事とまとめて送られ、統計には入らない。テストが通り、tsc・build・test が通る",
-      "resolution": null,
+      "resolution": "Factory が取り込みました（factory/todos-api）",
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-11T13:33:28.399Z",
-      "updatedAt": "2026-10-11T14:34:49.723Z",
-      "closedAt": null,
+      "updatedAt": "2026-10-11T23:06:15.871Z",
+      "closedAt": "2026-10-11T23:06:15.871Z",
       "extra": {}
     },
     {
