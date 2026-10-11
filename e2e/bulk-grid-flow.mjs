@@ -70,7 +70,7 @@ try {
   const grid = page.locator(".bulk-grid .dsg-container");
   await grid.waitFor();
   const heads = (await grid.locator(".dsg-cell-header").allInnerTexts()).map((t) => t.trim()).filter(Boolean);
-  const wantHeads = ["グループ", "家事の名前", "周期", "期限", "担当", "通知の時刻", "無効", "削除"];
+  const wantHeads = ["グループ", "家事の名前", "周期", "期限", "担当", "通知の時刻", "やり方", "無効", "削除"];
   if (heads.join(",") !== wantHeads.join(",")) throw new Error(`列の並びが「${heads.join("・")}」`);
   const cell = (row, field) => page.locator(`[data-cell="${row}-${field}"]`);
   const text = async (row, field) => (await cell(row, field).locator(".bulk-grid__text").innerText()).trim();
@@ -87,7 +87,7 @@ try {
   const rowCount = () => grid.locator("[data-gutter]").evaluateAll((es) => Math.max(0, ...es.map((e) => Number(e.dataset.gutter))));
   const popover = page.locator(".grid-popover");
   await page.getByRole("button", { name: "変更はありません" }).waitFor();
-  ok("一覧の「表で編集」で開くと、見出しは「家事を表で編集」、列はグループ・家事の名前・周期・期限・担当・通知の時刻・無効・削除の順");
+  ok("一覧の「表で編集」で開くと、見出しは「家事を表で編集」、列はグループ・家事の名前・周期・期限・担当・通知の時刻・やり方・無効・削除の順");
 
   // ---- (5) Excel 形式（タブ区切り）の3行を新しい行に貼り付ける（最後の行をこえたら行が増える） ----
   step = "paste";
@@ -424,6 +424,45 @@ try {
   if (lastDialog) throw new Error(`保存したのに離れる確かめが出た: ${lastDialog}`);
   await page.getByRole("link", { name: "床ふき" }).waitFor();
   ok("「保存して編集を続ける」で画面に残って「1件を追加しました」、足した行は登録済みになり、続けて担当を変えて保存でき、離れるときの確かめも出ない");
+
+  // ---- やり方のマス：押すと書く欄とプレビューの画面。「決める」で「あり」になり、保存すると詳細に出る ----
+  step = "howto-cell";
+  await page.getByRole("button", { name: "表で編集" }).click();
+  await h1(page, "家事を表で編集");
+  await grid.waitFor();
+  await expectText(floor, "name", "床ふき");
+  await expectText(floor, "howto", "—");
+  await cell(floor, "howto").click();
+  const howtoDlg = page.getByRole("dialog", { name: "床ふきのやり方" });
+  await howtoDlg.waitFor();
+  await howtoDlg.getByLabel("やり方（Markdown）").fill("## 道具\n- [ ] モップ\n\n| 場所 | 回数 |\n| --- | --- |\n| 廊下 | 2 |\n\n<img src=x onerror=\"window.__xss=1\">");
+  await howtoDlg.getByRole("region", { name: "プレビュー" }).getByRole("heading", { name: "道具" }).waitFor();
+  await howtoDlg.getByRole("region", { name: "プレビュー" }).getByRole("cell", { name: "廊下" }).waitFor();
+  await page.screenshot({ path: `${SHOTS}/44-table-howto.png` });
+  await howtoDlg.getByRole("button", { name: "決める" }).click();
+  await howtoDlg.waitFor({ state: "detached" });
+  await expectText(floor, "howto", "あり");
+  if (!(await cell(floor, "howto").evaluate((e) => e.classList.contains("is-changed")))) throw new Error("やり方のマスに変えた印が無い");
+  // やめると変わらない
+  await cell(floor, "howto").click();
+  await howtoDlg.waitFor();
+  await howtoDlg.getByLabel("やり方（Markdown）").fill("書きかけ");
+  await howtoDlg.getByRole("button", { name: "やめる" }).click();
+  await howtoDlg.waitFor({ state: "detached" });
+  await page.getByRole("button", { name: "1件の変更を保存" }).click();
+  await h1(page, "家事");
+  await page.getByRole("link", { name: "床ふき" }).click();
+  await h1(page, "床ふき");
+  // 「## 見出し」は画面の h2 の下に入るよう h4 になる
+  await page.locator(".howto .md").getByRole("heading", { level: 4, name: "道具" }).waitFor();
+  await page.getByText(/最後に直した人 たくみ・/).waitFor();
+  if (await page.locator(".howto img").count()) throw new Error("やり方に img が出た");
+  if (await page.evaluate(() => window.__xss)) throw new Error("やり方の HTML が実行された");
+  await page.goto(`${ORIGIN}/chores/table`);
+  await h1(page, "家事を表で編集");
+  await page.locator(".bulk-grid .dsg-container").waitFor();
+  await expectText(floor, "howto", "あり");
+  ok("やり方のマスを押すと書く欄とプレビュー（見出し・表）、「決める」で「あり」、やめると変わらず、保存すると詳細に整形されて出る（img は出ない）");
 
   // ---- (7) スマホ幅では1行ずつ足す画面 ----
   step = "phone";

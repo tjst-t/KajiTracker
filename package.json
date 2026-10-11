@@ -28,7 +28,9 @@
     "qrcode": "^1.5.4",
     "react": "^19.3.0",
     "react-datasheet-grid": "^4.11.6",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.62.5",

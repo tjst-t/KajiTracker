@@ -133,6 +133,10 @@ export const chores = sqliteTable(
     groupId: text("group_id").references(() => choreGroups.id, { onDelete: "set null" }),
     notifyTime: text("notify_time"),
     archivedAt: text("archived_at"),
+    /** やり方（Markdown、最大 10000 文字）。画面では HTML を出さずに描く */
+    howto: text(),
+    howtoUpdatedAt: text("howto_updated_at"),
+    howtoUpdatedBy: text("howto_updated_by").references(() => users.id, { onDelete: "set null" }),
     createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: now("created_at"),
     updatedAt: now("updated_at"),

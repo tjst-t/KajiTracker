@@ -7,12 +7,13 @@ import { type CellProps, type Column, type ContextMenuComponentProps, type Conte
 import { type DateStr, addDays, daysInMonth, toDayNum, weekdayOf } from "../../shared/date";
 import { WEEKDAYS } from "../../shared/describe";
 import { MAX_INTERVAL_DAYS, formatScheduleText, parseDateText, parseScheduleText } from "../../shared/schedule-text";
+import { HowtoCellDialog } from "./Howto";
 import { type CalState, CalendarFields, anchorOfCal, calError, calValid, everyOfCal, initialCal, ruleOfCal } from "./CalendarFields";
 
 /** 表の1行。id のほかは全部文字 */
 export type SheetRow = { id: string } & Record<string, string>;
-/** マスを押すと開くもの。check はチェックの入り切り */
-export type Picker = "list" | "date" | "schedule" | "check";
+/** マスを押すと開くもの。check はチェックの入り切り、markdown は書く欄とプレビューの小さな画面 */
+export type Picker = "list" | "date" | "schedule" | "check" | "markdown";
 export type SheetCol = { field: string; title: string; picker?: Picker; placeholder?: string; basis: number; grow?: number; minWidth?: number };
 
 /** チェックの入ったマスの文字 */
@@ -111,7 +112,7 @@ function SheetCell({ rowData, rowIndex, columnIndex, focus, active, disabled, co
     >
       {c.picker === "check" && override === undefined ? (
         <input type="checkbox" className="dsg-checkbox" tabIndex={-1} checked={!!value} disabled={disabled} aria-label={label} onChange={() => null} />
-      ) : focus && c.picker !== "check" ? (
+      ) : focus && c.picker !== "check" && c.picker !== "markdown" ? (
         <input
           ref={inputRef}
           className="dsg-input"
@@ -124,7 +125,10 @@ function SheetCell({ rowData, rowIndex, columnIndex, focus, active, disabled, co
       ) : (
         <span className="bulk-grid__text">{shown}</span>
       )}
-      {focus && c.picker && c.picker !== "check" && (
+      {focus && c.picker === "markdown" && (
+        <HowtoCellDialog title={`${rowData.name?.trim() || `${rowIndex + 1}行目`}のやり方`} value={value} onSave={(text) => choose({ [c.field]: text })} onCancel={() => stopEditing({ nextRow: false })} />
+      )}
+      {focus && c.picker && c.picker !== "check" && c.picker !== "markdown" && (
         <Popover anchor={boxRef} label={`${label}を選ぶ`} onDismiss={() => stopEditing({ nextRow: false })}>
           {c.picker === "list" ? (
             <ul className="pick-list" role="listbox" aria-label={c.title}>
@@ -437,6 +441,8 @@ export function useSheet<R extends SheetRow>(o: SheetOptions<R>) {
   keyRef.current = (e) => {
     const g = gridRef.current;
     const mod = e.ctrlKey || e.metaKey;
+    // マスから開いた画面（やり方を書く）の中のキーは、その画面が受ける
+    if ((e.target as HTMLElement).closest?.("dialog")) return;
     if (!editingRef.current) {
       rangeRef.current = g?.selection ?? null;
       const t = e.target as HTMLElement;
@@ -487,7 +493,8 @@ export function useSheet<R extends SheetRow>(o: SheetOptions<R>) {
         disabled: ({ rowData }) => !!optsRef.current.disabled?.(c.field, rowData),
         copyValue: ({ rowData }) => rowData[c.field] ?? "",
         pasteValue: ({ rowData, value }) => {
-          const text = value.replace(/[\n\r]+/g, " ").trim();
+          // やり方（Markdown）は改行も残す
+          const text = c.picker === "markdown" ? value : value.replace(/[\n\r]+/g, " ").trim();
           return { ...rowData, [c.field]: c.picker === "check" ? checkText(text) : text };
         },
         deleteValue: ({ rowData }) => ({ ...rowData, [c.field]: "" }),

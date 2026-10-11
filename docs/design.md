@@ -111,6 +111,8 @@ PK は (key, window_start)。
 | calendar_rule | text NULL | `calendar` のとき。JSON（下を参照） |
 | assignee_user_id | text NULL | 担当者。抜けたら NULL に戻す |
 | notify_time | text NULL | 家事ごとの通知の時刻。あれば人の時刻より優先 |
+| howto | text NULL | やり方（Markdown、最大 10000 文字。空白だけなら NULL）。HTML もそのまま預かり、画面で HTML として出さない |
+| howto_updated_at / howto_updated_by | timestamp NULL / text FK NULL | やり方を最後に直した日時と人（中身が変わったときだけ更新。人が消えたら NULL） |
 | archived_at | timestamp NULL | 無効にした家事（今日の画面・一覧・通知から外す。記録と統計は残す。画面では「無効」） |
 | created_by / created_at / updated_at | | |
 
@@ -208,8 +210,8 @@ Family を作ると「キッチン・風呂・トイレ・洗濯・ゴミ捨て�
 | # | 画面 | 主に使う | 中身 |
 |---|---|---|---|
 | S1 | **今日**（ホーム） | スマホ | いちばん上に「期限が来ている」家事（遅れ日数の多い順、次に今日のもの）。大きな「やった」ボタンでワンタップ記録、押した直後に「取り消す」を出す。その下に「近いうち（7日以内）」、「そのほか」 |
-| S2 | 家事の詳細 | 両方 | 次の期限・周期・担当。記録の履歴（カレンダー表示）、記録の取り消し、過去の日付で記録。この家事の統計（守れた率、平均の遅れ、実際の平均間隔と周期の差） |
-| S3 | 家事の登録・編集 | PC | 名前、周期の種類（日数＋最初の期限 ／ カレンダーの規則）、担当者、通知の時刻、無効にする・消す |
+| S2 | 家事の詳細 | 両方 | やり方（Markdown）と最後に直した人・日時。次の期限・周期・担当。記録の履歴（カレンダー表示）、記録の取り消し、過去の日付で記録。この家事の統計（守れた率、平均の遅れ、実際の平均間隔と周期の差） |
+| S3 | 家事の登録・編集 | PC | 名前、周期の種類（日数＋最初の期限 ／ カレンダーの規則）、担当者、通知の時刻、やり方（Markdown。PC 幅は入力とプレビューを左右に、スマホ幅は「書く／見る」）、無効にする・消す |
 | S4 | 家事の一覧 | PC | 表で全部の家事。周期・次の期限・担当・最後にやった人で並べ替え |
 | S5 | 統計 | 両方 | 期間の切り替え（今月・3か月・全期間）。分担、担当の偏り、守れた率と平均の遅れ、週・月ごとの回数の推移、よく遅れる家事のランキング |
 | S6 | Family | 両方 | メンバーと役割。管理者は：招待の QR、外す、管理者にする・戻す、回復の札を出す、名前の変更、削除。だれでも：抜ける |
@@ -219,6 +221,8 @@ Family を作ると「キッチン・風呂・トイレ・洗濯・ゴミ捨て�
 | S10 | 招待を受ける（`#invite=…`） | スマホ | 初めての人：表示名 → パスキー作成 → 参加。アカウントがある人：ログイン → 参加 |
 | S11 | 札で入る（`#login=…`） | 両方 | 引き換え → 続けて「この端末のパスキーを登録」 |
 | S12 | ホーム画面に追加の案内 | スマホ | iPhone で、ホーム画面に追加していない状態で通知をオンにしようとしたときに出す |
+
+やり方の Markdown は `components/Markdown.tsx`（react-markdown＋remark-gfm、`skipHtml`。rehype-raw は使わない）で React の要素にするだけで、HTML の文字列を作らない。HTML の直書きは捨て、`javascript:` などのリンクは react-markdown が消す。見出しは画面の見出しの下に入るよう `#` を h3 から。リンクは `target=_blank rel="noopener noreferrer"`、チェックリストの印は押せない飾り、画像は読み込まずリンクにする。重いので lazy で読む（`components/Howto.tsx`）。今日の札の「やり方」は札のメタの行の終わりに小さく置き、押すとダイアログで読む。表で編集の「やり方」のマス（あり／—）を押すと、書く欄とプレビューの小さな画面が開き、「決める」でマスに入れる（保存は表の保存ボタン）。
 
 「端末が入りました」の知らせは、QR を出している間、出した側の画面が札の状態を数秒ごとに問い合わせて出す（Workers で常時接続を持たないため）。
 
@@ -252,13 +256,14 @@ Cookie で来る要求には `X-Kaji-Client: 1` が要る。★ は step-up が�
 
 **家事と記録**
 - `GET /families/:fid/chores`（期限・状態・前回の記録つき。`?archived=1` で無効の家事も）、`POST /families/:fid/chores`
+- 家事の返り値（一覧・詳細・登録）には `howto`・`hasHowto`・`howtoUpdatedAt`・`howtoUpdatedByName` が付く。`POST`・`PATCH /chores/:id`・bulk の create と chores で `howto`（文字。空・null で消す）を受け付け、中身が変わったときだけ直した人と日時を更新する。10000 文字をこえたら 400
 - `GET /chores/:id`（記録・回・家事ごとの統計つき）、`PATCH /chores/:id`（`archived` で無効にする・有効に戻す）、`DELETE /chores/:id`
 - `POST /chores/:id/logs`（`doneOn` は省くと今日。先の日付は断る）、`DELETE /logs/:id`（取り消し。家族のだれでも）
 - 周期の入力：`{type:"interval", intervalDays, firstDueOn}` か `{type:"calendar", rule}`。毎週・毎月は anchor を省くと登録した日（編集では前の基準日）。隔週・数か月ごとは anchor 必須で、規則に当たる日でなければ断る
 
 - `GET /families/:fid/groups`、`POST /families/:fid/groups`、`PATCH /groups/:id`（名前・並び順）、`DELETE /groups/:id`（家事はグループなしに）
 - `POST /families/:fid/chores/bulk`（まとめて登録。1行でも不備があれば1件も入れず、`rows: [{index, message}]` を返す。100件まで）
-- `PATCH /families/:fid/chores/bulk`（表で編集。`{ create?: ChoreInput[], chores?: [{ id, name?, schedule?, groupId?, assigneeUserId?, notifyTime?, archived? }], deleteIds?: string[] }` で、足す・直す・消すを1つの batch で行う（どれか失敗したら全部戻る）。chores は来なかった項目は変えない。周期の基準日は `PATCH /chores/:id` と同じく引き継ぐ。消すと記録も cascade で消える。よその Family の家事・不備が1行でもあれば1件も変えず `bulk_invalid` の 400、`rows: [{ kind: "create"|"update"|"delete", index, message }]`（index はそれぞれの配列の中の位置）。同じ家事を直すのと消すの両方に入れると 400。3つとも空なら 400。返り値は `{ created, updated, deleted }`。合わせて200件まで）
+- `PATCH /families/:fid/chores/bulk`（表で編集。`{ create?: ChoreInput[], chores?: [{ id, name?, schedule?, groupId?, assigneeUserId?, notifyTime?, howto?, archived? }], deleteIds?: string[] }` で、足す・直す・消すを1つの batch で行う（どれか失敗したら全部戻る）。chores は来なかった項目は変えない。周期の基準日は `PATCH /chores/:id` と同じく引き継ぐ。消すと記録も cascade で消える。よその Family の家事・不備が1行でもあれば1件も変えず `bulk_invalid` の 400、`rows: [{ kind: "create"|"update"|"delete", index, message }]`（index はそれぞれの配列の中の位置）。同じ家事を直すのと消すの両方に入れると 400。3つとも空なら 400。返り値は `{ created, updated, deleted }`。合わせて200件まで）
 
 **統計**
 - `GET /families/:fid/stats?from=&to=`（日本時間の日付、両端を含む。省いた側は今月の初日・末日）。計算は `src/shared/stats.ts`

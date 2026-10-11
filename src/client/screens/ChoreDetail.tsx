@@ -3,11 +3,12 @@ import { describeSchedule, shortDate } from "../../shared/describe";
 import { api } from "../api";
 import type { ChoreDetail as Detail } from "../chores";
 import { Hanko } from "../components/Fuda";
+import { HowtoMeta, Markdown } from "../components/Howto";
 import { HistoryCalendar } from "../components/HistoryCalendar";
 import { errorText } from "../format";
 import type { Nav } from "../router";
 
-/** S2 家事の詳細：次の期限、記録（取り消し・さかのぼり）、この家事の統計、編集・無効にする・消す */
+/** S2 家事の詳細：やり方、次の期限、記録（取り消し・さかのぼり）、この家事の統計、編集・無効にする・消す */
 export function ChoreDetail({ id, nav }: { id: string; nav: Nav }) {
   const [c, setC] = useState<Detail | null>(null);
   const [date, setDate] = useState("");
@@ -77,6 +78,14 @@ export function ChoreDetail({ id, nav }: { id: string; nav: Nav }) {
         </div>
         {!c.archived && <Hanko chore={c} today={c.today} />}
       </div>
+
+      <section className="howto" aria-labelledby="d-howto">
+        <h2 id="d-howto" className="howto__title">
+          やり方
+        </h2>
+        {c.howto ? <Markdown text={c.howto} /> : <p className="muted">やり方はまだありません。編集から書けます。</p>}
+        <HowtoMeta chore={c} />
+      </section>
 
       {message && (
         <p className={message.kind === "ok" ? "notice notice--ok" : "error"} role={message.kind === "ok" ? "status" : "alert"}>

@@ -38,6 +38,8 @@ export function Fuda(props: {
   onOpen: () => void;
   onDone: () => void;
   onUndo: () => void;
+  /** やり方を開く（やり方のある家事だけ） */
+  onHowto?: () => void;
 }) {
   const { chore, done } = props;
   const meta: ReactNode[] = [];
@@ -62,7 +64,15 @@ export function Fuda(props: {
                 {chore.name}
               </a>
             </h3>
-            <p className="fuda__meta">{meta.reduce<ReactNode[]>((acc, m, i) => (i ? [...acc, "、", m] : [m]), [])}</p>
+            <p className="fuda__meta">
+              {meta.reduce<ReactNode[]>((acc, m, i) => (i ? [...acc, "、", m] : [m]), [])}
+              {props.onHowto && (
+                // 札の大きさは変えない：メタの行の終わりに小さく置く
+                <button type="button" className="fuda__howto" onClick={props.onHowto} tabIndex={done ? -1 : 0} aria-label={`${chore.name}のやり方`}>
+                  やり方
+                </button>
+              )}
+            </p>
           </div>
           <Hanko chore={chore} today={props.today} />
           <button className="btn btn--primary fuda__done" onClick={props.onDone} disabled={props.busy || !!done} tabIndex={done ? -1 : 0}>

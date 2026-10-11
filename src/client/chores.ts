@@ -12,6 +12,11 @@ export type ChoreView = {
   groupId: string | null;
   groupName: string | null;
   notifyTime: string | null;
+  /** やり方（Markdown） */
+  howto: string | null;
+  hasHowto: boolean;
+  howtoUpdatedAt: string | null;
+  howtoUpdatedByName: string | null;
   archived: boolean;
   dueOn: string | null;
   status: Status;

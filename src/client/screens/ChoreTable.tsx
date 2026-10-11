@@ -10,6 +10,7 @@ import { formatScheduleText, parseDateText, parseScheduleText } from "../../shar
 import type { ChoreTemplate } from "../../shared/templates";
 import { ApiError, type Family, type Group, type Member, api } from "../api";
 import type { ChoreView } from "../chores";
+import { HOWTO_MAX, howtoLength } from "../components/Howto";
 import { CHECKED, ContextMenu, ROW_HEIGHT, type SheetCol, SheetCtx, type SheetCtxValue, norm, useSheet } from "../components/Sheet";
 import { TemplateDialog, useModal } from "../components/TemplateDialog";
 import { errorText } from "../format";
@@ -17,7 +18,18 @@ import { type Nav, setLeaveGuard } from "../router";
 import { ChoreBulk, useWide } from "./ChoreBulk";
 import { TIMES } from "./ChoreForm";
 
-type EditRow = { id: string; group: string; name: string; schedule: string; due: string; assignee: string; notify: string; archived: string; delete: string };
+type EditRow = {
+  id: string;
+  group: string;
+  name: string;
+  schedule: string;
+  due: string;
+  assignee: string;
+  notify: string;
+  howto: string;
+  archived: string;
+  delete: string;
+};
 type Field = Exclude<keyof EditRow, "id">;
 
 /** 列の並び（col の番号はこの順） */
@@ -28,6 +40,7 @@ const COLS: (SheetCol & { field: Field })[] = [
   { field: "due", title: "期限", picker: "date", basis: 150 },
   { field: "assignee", title: "担当", picker: "list", basis: 130 },
   { field: "notify", title: "通知の時刻", picker: "list", basis: 120, minWidth: 100 },
+  { field: "howto", title: "やり方", picker: "markdown", basis: 90, grow: 0, minWidth: 90 },
   { field: "archived", title: "無効", picker: "check", basis: 80, grow: 0, minWidth: 80 },
   { field: "delete", title: "削除", picker: "check", basis: 80, grow: 0, minWidth: 80 },
 ];
@@ -50,6 +63,7 @@ const blankRow = (patch: Partial<EditRow> = {}): EditRow => ({
   due: "",
   assignee: "",
   notify: "",
+  howto: "",
   archived: "",
   delete: "",
   ...patch,
@@ -78,6 +92,7 @@ function rowOf(c: ChoreView): EditRow {
     due,
     assignee: c.assigneeName ?? "",
     notify: c.notifyTime ?? "",
+    howto: c.howto ?? "",
     archived: c.archived ? CHECKED : "",
     delete: "",
   };
@@ -128,13 +143,15 @@ function readCommon(r: EditRow, { groups, members }: Refs) {
   if (assigneeUserId === undefined) errors.assignee = `「${r.assignee.trim()}」という人は Family にいません`;
   const notifyTime = parseNotify(r.notify);
   if (notifyTime === undefined) errors.notify = `「${r.notify.trim()}」は時刻として読めません（15 分きざみ、例 07:00）`;
-  return { errors, name, groupId, assigneeUserId, notifyTime };
+  const howto = r.howto.trim() ? r.howto : null;
+  if (howto && howtoLength(howto) > HOWTO_MAX) errors.howto = `やり方は${HOWTO_MAX}文字までです`;
+  return { errors, name, groupId, assigneeUserId, notifyTime, howto };
 }
 
 /** 新しい行。期限は最初の期限（まとめて登録と同じ扱い） */
 function checkNew(r: EditRow, refs: Refs): Checked {
   const { today } = refs;
-  const { errors, name, groupId, assigneeUserId, notifyTime } = readCommon(r, refs);
+  const { errors, name, groupId, assigneeUserId, notifyTime, howto } = readCommon(r, refs);
   const dueText = r.due.trim();
   const due = dueText ? parseDateText(dueText, today) : null;
   if (dueText && !due) errors.due = `「${dueText}」は日付として読めません（例：2026-10-20、10/20）`;
@@ -160,7 +177,7 @@ function checkNew(r: EditRow, refs: Refs): Checked {
 
   if (!name) return { errors: {}, changed: new Set(), dueHint, dueDisabled };
   const ok = Object.keys(errors).length === 0;
-  return { errors, changed: new Set(), dueHint, dueDisabled, payload: ok ? { name, groupId, assigneeUserId, notifyTime, schedule } : undefined };
+  return { errors, changed: new Set(), dueHint, dueDisabled, payload: ok ? { name, groupId, assigneeUserId, notifyTime, schedule, howto } : undefined };
 }
 
 /** 登録済みの行。期限は次の期限。変えた項目だけを送る */
@@ -187,6 +204,10 @@ function checkExisting(r: EditRow, orig: EditRow, chore: ChoreView, refs: Refs):
     changed.add("notify");
     payload.notifyTime = common.notifyTime;
   } else if (common.notifyTime === undefined) changed.add("notify");
+  if ((common.howto ?? "") !== (orig.howto.trim() ? orig.howto : "")) {
+    changed.add("howto");
+    payload.howto = common.howto;
+  } else delete errors.howto;
   if (!!r.archived !== !!orig.archived) {
     changed.add("archived");
     payload.archived = !!r.archived;
@@ -434,6 +455,7 @@ function ChoreTableGrid({
       if (f === "notify" && !r.notify) return { ...out, shown: <span className="bulk-grid__hint">それぞれ</span> };
       if (f === "group" && !r.group) return { ...out, shown: <span className="bulk-grid__hint">なし</span> };
       if (f === "assignee" && !r.assignee) return { ...out, shown: <span className="bulk-grid__hint">なし</span> };
+      if (f === "howto") return { ...out, shown: r.howto?.trim() ? "あり" : <span className="bulk-grid__hint">—</span> };
       if (f !== "due") return out;
       const hint = <span className="bulk-grid__hint">{check?.dueHint ?? (disabled ? "—" : undefined)}</span>;
       if (disabled || !r.due) return { ...out, shown: hint };

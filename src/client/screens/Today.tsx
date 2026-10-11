@@ -4,6 +4,7 @@ import { WEEKDAYS, shortDate } from "../../shared/describe";
 import { type Family, type Me, api } from "../api";
 import type { ChoreView, LogView } from "../chores";
 import { Fuda, lastText } from "../components/Fuda";
+import { HowtoDialog } from "../components/Howto";
 import { errorText } from "../format";
 import type { Nav } from "../router";
 
@@ -20,6 +21,7 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
   const [done, setDone] = useState<Record<string, LogView>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [howto, setHowto] = useState<ChoreView | null>(null);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const load = useCallback(async () => {
@@ -153,6 +155,7 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
                     onOpen={() => nav.go({ name: "chore", id: c.id })}
                     onDone={() => void markDone(c)}
                     onUndo={() => void undo(c)}
+                    onHowto={c.hasHowto ? () => setHowto(c) : undefined}
                   />
                 ))}
               </ul>
@@ -177,6 +180,7 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
           )}
         </>
       )}
+      {howto && <HowtoDialog chore={howto} onClose={() => setHowto(null)} />}
       {me.passkeyCount === 0 && (
         <p className="notice">あなたのアカウントには、まだパスキーがありません。「設定」でパスキーを作っておくと、次からすぐにログインできます。</p>
       )}

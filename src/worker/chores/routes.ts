@@ -1,5 +1,6 @@
 // 家事と記録。仕様は docs/spec.md「家事」「記録」、期限の計算は src/shared/schedule.ts。
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { body } from "../auth/routes";
@@ -81,6 +82,18 @@ function validChoreNotify(t: unknown): string | null {
   return t;
 }
 
+const HOWTO_MAX = 10000;
+
+/** やり方（Markdown）。空なら null。改行は \n にそろえる。HTML はそのまま預かる（画面で HTML として出さない） */
+function validHowto(t: unknown): string | null {
+  if (t === null || t === undefined) return null;
+  if (typeof t !== "string") fail(400, "やり方が正しくありません");
+  const v = t.replace(/\r\n?/g, "\n");
+  if (!v.trim()) return null;
+  if ([...v].length > HOWTO_MAX) fail(400, `やり方は ${HOWTO_MAX} 文字までです`);
+  return v;
+}
+
 /** 家事を引き、その Family のメンバーか確かめる */
 async function loadChore(c: Ctx, id: string) {
   requireAuth(c);
@@ -112,7 +125,11 @@ async function logsByChore(c: Ctx, choreIds: string[]): Promise<Map<string, LogV
   return map;
 }
 
-function view(chore: ChoreRow, assigneeName: string | null, groupName: string | null, choreLogs: LogView[], today: DateStr) {
+/** やり方を最後に直した人（担当の users と分けて引く） */
+const howtoUser = alias(users, "howto_user");
+type Names = { assigneeName: string | null; groupName: string | null; howtoUpdatedByName: string | null };
+
+function view(chore: ChoreRow, { assigneeName, groupName, howtoUpdatedByName }: Names, choreLogs: LogView[], today: DateStr) {
   const schedule = scheduleOf(chore);
   const ev = evaluate(schedule, choreLogs.map((l) => l.doneOn), today);
   return {
@@ -125,6 +142,10 @@ function view(chore: ChoreRow, assigneeName: string | null, groupName: string | 
     groupId: chore.groupId,
     groupName,
     notifyTime: chore.notifyTime,
+    howto: chore.howto,
+    hasHowto: !!chore.howto,
+    howtoUpdatedAt: chore.howtoUpdatedAt,
+    howtoUpdatedByName,
     archived: !!chore.archivedAt,
     dueOn: ev.dueOn,
     status: ev.status,
@@ -153,20 +174,23 @@ export function choreStats(schedule: Schedule, ev: Evaluation, doneOns: DateStr[
   };
 }
 
-/** 家事1つを、担当とグループの名前つきで引く */
-async function loadNamed(c: Ctx, id: string) {
-  const r = await c
+/** 家事を、担当・グループ・やり方を直した人の名前つきで引く */
+function selectNamed(c: Ctx) {
+  return c
     .get("db")
-    .select({ chore: chores, assigneeName: users.displayName, groupName: choreGroups.name })
+    .select({ chore: chores, assigneeName: users.displayName, groupName: choreGroups.name, howtoUpdatedByName: howtoUser.displayName })
     .from(chores)
     .leftJoin(users, eq(chores.assigneeUserId, users.id))
     .leftJoin(choreGroups, eq(chores.groupId, choreGroups.id))
-    .where(eq(chores.id, id))
-    .get();
+    .leftJoin(howtoUser, eq(chores.howtoUpdatedBy, howtoUser.id));
+}
+
+async function loadNamed(c: Ctx, id: string) {
+  const r = await selectNamed(c).where(eq(chores.id, id)).get();
   return r!;
 }
 
-type ChoreInput = { name: unknown; schedule: unknown; assigneeUserId: unknown; groupId: unknown; notifyTime: unknown };
+type ChoreInput = { name: unknown; schedule: unknown; assigneeUserId: unknown; groupId: unknown; notifyTime: unknown; howto: unknown };
 
 /** 画面から来た1つの家事を確かめ、chores に入れる行にする（まだ入れない） */
 async function buildChoreRow(c: Ctx, fid: string, userId: string, b: Partial<ChoreInput>, today: DateStr, refs?: FamilyRefs) {
@@ -178,8 +202,14 @@ async function buildChoreRow(c: Ctx, fid: string, userId: string, b: Partial<Cho
     assigneeUserId: await validAssignee(c, fid, b.assigneeUserId, refs?.members),
     groupId: await validGroup(c, fid, b.groupId, refs?.groups),
     notifyTime: validChoreNotify(b.notifyTime),
+    ...howtoColumns(validHowto(b.howto), userId),
     createdBy: userId,
   };
+}
+
+/** やり方の列。書いてあれば、直した人と日時も入れる */
+function howtoColumns(howto: string | null, userId: string) {
+  return { howto, howtoUpdatedAt: howto === null ? null : nowIso(), howtoUpdatedBy: howto === null ? null : userId };
 }
 
 type ChorePatch = Partial<ChoreInput> & { archived?: unknown };
@@ -196,7 +226,7 @@ async function familyRefs(c: Ctx, fid: string): Promise<FamilyRefs> {
 }
 
 /** 家事1つへの変更を確かめ、chores の update に渡す値にする（まだ入れない）。来なかった項目は変えない */
-async function buildChorePatch(c: Ctx, chore: ChoreRow, b: ChorePatch, today: DateStr, refs?: FamilyRefs) {
+async function buildChorePatch(c: Ctx, chore: ChoreRow, userId: string, b: ChorePatch, today: DateStr, refs?: FamilyRefs) {
   const set: Partial<typeof chores.$inferInsert> = { updatedAt: nowIso() };
   if (b.name !== undefined) set.name = validName(b.name);
   // 毎週・毎月で基準日が来なければ、前の基準日を引き継ぐ
@@ -204,6 +234,11 @@ async function buildChorePatch(c: Ctx, chore: ChoreRow, b: ChorePatch, today: Da
   if (b.assigneeUserId !== undefined) set.assigneeUserId = await validAssignee(c, chore.familyId, b.assigneeUserId, refs?.members);
   if (b.groupId !== undefined) set.groupId = await validGroup(c, chore.familyId, b.groupId, refs?.groups);
   if (b.notifyTime !== undefined) set.notifyTime = validChoreNotify(b.notifyTime);
+  // やり方は変わったときだけ、直した人と日時を記録する（消したときも記録する）
+  if (b.howto !== undefined) {
+    const howto = validHowto(b.howto);
+    if (howto !== chore.howto) Object.assign(set, { howto, howtoUpdatedAt: nowIso(), howtoUpdatedBy: userId });
+  }
   if (b.archived !== undefined) set.archivedAt = b.archived ? (chore.archivedAt ?? nowIso()) : null;
   return set;
 }
@@ -221,12 +256,7 @@ export const choreRoutes = new Hono<AppEnv>()
     const fid = c.req.param("fid");
     await requireMember(c, fid);
     const includeArchived = c.req.query("archived") === "1";
-    const db = c.get("db");
-    const rows = await db
-      .select({ chore: chores, assigneeName: users.displayName, groupName: choreGroups.name })
-      .from(chores)
-      .leftJoin(users, eq(chores.assigneeUserId, users.id))
-      .leftJoin(choreGroups, eq(chores.groupId, choreGroups.id))
+    const rows = await selectNamed(c)
       .where(includeArchived ? eq(chores.familyId, fid) : and(eq(chores.familyId, fid), isNull(chores.archivedAt)))
       .all();
     const byChore = await logsByChore(
@@ -234,7 +264,7 @@ export const choreRoutes = new Hono<AppEnv>()
       rows.map((r) => r.chore.id),
     );
     const today = todayInTokyo();
-    return c.json({ today, chores: rows.map((r) => strip(view(r.chore, r.assigneeName, r.groupName, byChore.get(r.chore.id) ?? [], today))) });
+    return c.json({ today, chores: rows.map((r) => strip(view(r.chore, r, byChore.get(r.chore.id) ?? [], today))) });
   })
   .post("/families/:fid/chores", async (c) => {
     const fid = c.req.param("fid");
@@ -244,7 +274,7 @@ export const choreRoutes = new Hono<AppEnv>()
     const row = await buildChoreRow(c, fid, userId, b, today);
     await c.get("db").insert(chores).values(row);
     const r = await loadNamed(c, row.id);
-    return c.json(strip(view(r.chore, r.assigneeName, r.groupName, [], today)), 201);
+    return c.json(strip(view(r.chore, r, [], today)), 201);
   })
   /** まとめて登録。1行でも不備があれば1つも入れず、不備のある行を返す */
   .post("/families/:fid/chores/bulk", async (c) => {
@@ -315,7 +345,7 @@ export const choreRoutes = new Hono<AppEnv>()
         if (!chore) fail(400, "その家事はありません");
         if (seen.has(chore.id)) fail(400, "同じ家事が2回あります");
         seen.add(chore.id);
-        updates.push({ id: chore.id, set: await buildChorePatch(c, chore, b, today, refs) });
+        updates.push({ id: chore.id, set: await buildChorePatch(c, chore, userId, b, today, refs) });
       } catch (e) {
         if (!(e instanceof HTTPException)) throw e;
         errors.push({ kind: "update", index, message: e.message });
@@ -341,10 +371,10 @@ export const choreRoutes = new Hono<AppEnv>()
   })
   .get("/chores/:id", async (c) => {
     const chore = await loadChore(c, c.req.param("id"));
-    const { assigneeName, groupName } = await loadNamed(c, chore.id);
+    const names = await loadNamed(c, chore.id);
     const choreLogs = (await logsByChore(c, [chore.id])).get(chore.id) ?? [];
     const today = todayInTokyo();
-    const v = view(chore, assigneeName, groupName, choreLogs, today);
+    const v = view(chore, names, choreLogs, today);
     return c.json({
       ...strip(v),
       logs: choreLogs,
@@ -354,9 +384,10 @@ export const choreRoutes = new Hono<AppEnv>()
     });
   })
   .patch("/chores/:id", async (c) => {
+    const { user } = requireAuth(c);
     const chore = await loadChore(c, c.req.param("id"));
     const b = await body<ChorePatch>(c);
-    const set = await buildChorePatch(c, chore, b, todayInTokyo());
+    const set = await buildChorePatch(c, chore, user.id, b, todayInTokyo());
     await c.get("db").update(chores).set(set).where(eq(chores.id, chore.id));
     return c.json({ ok: true });
   })

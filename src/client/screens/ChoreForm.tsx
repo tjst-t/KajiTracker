@@ -4,6 +4,7 @@ import { describeRule, shortDate } from "../../shared/describe";
 import { type Schedule, evaluate } from "../../shared/schedule";
 import { type Family, type Group, type Member, api } from "../api";
 import type { ChoreDetail, ChoreView } from "../chores";
+import { HOWTO_MAX, HowtoEditor, howtoLength } from "../components/Howto";
 import { type CalState, CalendarFields, anchorOfCal, calError, calValid, initialCal, ruleForApi, ruleOfCal } from "../components/CalendarFields";
 import { errorText } from "../format";
 import type { Nav } from "../router";
@@ -19,6 +20,7 @@ type FormState = {
   groupId: string;
   assigneeUserId: string;
   notifyTime: string;
+  howto: string;
 };
 
 function initial(today: string, chore?: ChoreView): FormState {
@@ -31,6 +33,7 @@ function initial(today: string, chore?: ChoreView): FormState {
     groupId: chore?.groupId ?? "",
     assigneeUserId: chore?.assigneeUserId ?? "",
     notifyTime: chore?.notifyTime ?? "",
+    howto: chore?.howto ?? "",
   };
 }
 
@@ -89,6 +92,7 @@ export function ChoreForm({ family, nav, editId }: { family: Family; nav: Nav; e
       groupId: form.groupId || null,
       assigneeUserId: form.assigneeUserId || null,
       notifyTime: form.notifyTime || null,
+      howto: form.howto,
     };
     try {
       if (editId) {
@@ -106,7 +110,7 @@ export function ChoreForm({ family, nav, editId }: { family: Family; nav: Nav; e
   };
 
   return (
-    <main className="page">
+    <main className="page page--wide">
       <h1>{editId ? "家事を編集" : "家事を登録"}</h1>
       {!editId && (
         <p className="muted">
@@ -216,13 +220,15 @@ export function ChoreForm({ family, nav, editId }: { family: Family; nav: Nav; e
           </label>
         </div>
 
+        <HowtoEditor value={form.howto} onChange={(v) => set("howto", v)} />
+
         {error && (
           <p className="error" role="alert">
             {error}
           </p>
         )}
         <div className="form-actions">
-          <button className="btn btn--primary" type="submit" disabled={busy || !form.name.trim() || !schedule}>
+          <button className="btn btn--primary" type="submit" disabled={busy || !form.name.trim() || !schedule || howtoLength(form.howto) > HOWTO_MAX}>
             {editId ? "保存する" : "登録する"}
           </button>
           <button type="button" className="btn btn--quiet" onClick={() => nav.back(editId ? { name: "chore", id: editId } : { name: "chores" })}>

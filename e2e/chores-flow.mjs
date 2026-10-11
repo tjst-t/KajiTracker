@@ -156,13 +156,102 @@ try {
   });
   ok("PC の一覧（表）から編集して保存");
 
+  // ---- やり方（Markdown）：フォームで書く → 詳細に整形して出る → 今日の札の「やり方」で開く。HTML は実行されない ----
+  step = "howto";
+  const alerts = [];
+  for (const p of [pcPage, phone]) p.on("dialog", (d) => d.type() === "alert" && alerts.push(d.message()));
+  const xss = async (p) => {
+    if (alerts.length || (await p.evaluate(() => window.__xss))) throw new Error(`やり方の HTML が実行された: ${alerts}`);
+  };
+  await pcPage.getByText("やり方はまだありません。編集から書けます。").waitFor();
+  await phone.getByRole("button", { name: "今日", exact: true }).click();
+  const sheet = phone.locator(".fuda-wrap", { hasText: "シーツとまくらカバー" });
+  await sheet.waitFor();
+  const heightBefore = (await sheet.boundingBox()).height;
+  if (await sheet.getByRole("button", { name: /のやり方$/ }).count()) throw new Error("やり方が無いのに札に「やり方」がある");
+
+  await pcPage.getByRole("button", { name: "編集" }).click();
+  await h1(pcPage, "家事を編集");
+  const howtoText = [
+    "# 手順",
+    "- [ ] シーツを外す",
+    "- [x] **洗剤**を入れる",
+    "",
+    "[洗濯表示の見かた](https://example.com/wash)",
+    "",
+    "<script>window.__xss = 1; alert('script')</script>",
+    '<img src="x" onerror="window.__xss = 2; alert(\'img\')">',
+    "[押すと](javascript:window.__xss=3)",
+  ].join("\n");
+  await pcPage.getByLabel("やり方（Markdown）").fill(howtoText);
+  const preview = pcPage.getByRole("region", { name: "プレビュー" });
+  await preview.getByRole("heading", { level: 3, name: "手順" }).waitFor();
+  if (!(await pcPage.getByLabel("やり方（Markdown）").isVisible()) || !(await preview.isVisible())) throw new Error("PC 幅で入力とプレビューが並んでいない");
+  await xss(pcPage);
+  await pcPage.screenshot({ path: `${SHOTS}/16a-form-howto-pc.png`, fullPage: true });
+  await pcPage.getByRole("button", { name: "保存する" }).click();
+  await h1(pcPage, "シーツとまくらカバー");
+  const howto = pcPage.locator(".howto .md");
+  await howto.getByRole("heading", { level: 3, name: "手順" }).waitFor();
+  await howto.getByRole("img", { name: "やることの印" }).waitFor();
+  await howto.getByRole("img", { name: "済みの印" }).waitFor();
+  await howto.locator("strong", { hasText: "洗剤" }).waitFor();
+  const a = howto.getByRole("link", { name: "洗濯表示の見かた" });
+  if ((await a.getAttribute("target")) !== "_blank" || !(await a.getAttribute("rel")).includes("noopener")) throw new Error("リンクが新しいタブ・noopener でない");
+  const bad = await howto.evaluate((e) => e.querySelectorAll("script, img, input, [onerror]").length + [...e.querySelectorAll("a")].filter((x) => x.href.startsWith("javascript:")).length);
+  if (bad) throw new Error(`やり方に script・img・input・javascript: のリンクが ${bad} 個ある`);
+  await pcPage.getByText(/最後に直した人 たくみ・/).waitFor();
+  await pcPage.waitForTimeout(300);
+  await xss(pcPage);
+  await pcPage.screenshot({ path: `${SHOTS}/16b-detail-howto.png`, fullPage: true });
+  ok("やり方：フォームで見出し・チェックリスト・リンクを書くと、PC ではプレビューが並び、詳細に整形されて出る（最後に直した人つき）");
+
+  // 今日の札の「やり方」で開く（札の大きさは変わらない）
+  await phone.reload();
+  await sheet.waitFor();
+  await sheet.getByRole("button", { name: "シーツとまくらカバーのやり方" }).waitFor();
+  const heightAfter = (await sheet.boundingBox()).height;
+  if (Math.abs(heightAfter - heightBefore) > 1) throw new Error(`「やり方」で札の高さが変わった（${heightBefore} → ${heightAfter}）`);
+  await phone.screenshot({ path: `${SHOTS}/16c-today-howto-button.png` });
+  await sheet.getByRole("button", { name: "シーツとまくらカバーのやり方" }).click();
+  const hd = phone.getByRole("dialog", { name: "シーツとまくらカバーのやり方" });
+  await hd.getByRole("heading", { level: 3, name: "手順" }).waitFor();
+  await hd.getByRole("link", { name: "洗濯表示の見かた" }).waitFor();
+  await phone.waitForTimeout(300);
+  await xss(phone);
+  await phone.screenshot({ path: `${SHOTS}/16d-today-howto-dialog.png` });
+  await hd.getByRole("button", { name: "閉じる" }).click();
+  await hd.waitFor({ state: "detached" }).catch(() => hd.waitFor({ state: "hidden" }));
+  ok("今日の札に小さな「やり方」（札の高さは同じ）、押すとダイアログで整形して出る。script・img onerror は実行されない");
+
+  // スマホ幅のフォームは「書く／見る」の切り替え
+  await sheet.getByRole("link", { name: "シーツとまくらカバー" }).click();
+  await h1(phone, "シーツとまくらカバー");
+  await phone.getByRole("button", { name: "編集" }).click();
+  await h1(phone, "家事を編集");
+  const ta = phone.getByLabel("やり方（Markdown）");
+  if ((await ta.inputValue()) !== howtoText) throw new Error("編集のフォームに、保存したやり方が入っていない");
+  if (await phone.getByRole("region", { name: "プレビュー" }).isVisible()) throw new Error("スマホ幅の「書く」でプレビューが見えている");
+  await phone.getByRole("tab", { name: "見る" }).click();
+  await phone.getByRole("region", { name: "プレビュー" }).getByRole("heading", { name: "手順" }).waitFor();
+  if (await ta.isVisible()) throw new Error("スマホ幅の「見る」で入力欄が見えている");
+  await phone.locator(".howto-editor").screenshot({ path: `${SHOTS}/16e-form-howto-phone.png` });
+  await phone.getByRole("tab", { name: "書く" }).click();
+  await ta.waitFor();
+  await phone.getByRole("button", { name: "やめる" }).click();
+  await xss(phone);
+  ok("スマホ幅のフォームは「書く／見る」で切り替える");
+
   // ---- 第何週の何曜日：第1・第3 の 土・日（トグルで複数） ----
   step = "add-nth-weekday";
   /** トグル（チェックボックス）を labels のものだけ入れる */
   const toggleOnly = async (scope, all, on) => {
     for (const name of all) {
       const box = scope.getByLabel(name, { exact: true });
-      if ((await box.isChecked()) !== on.includes(name)) await box.setChecked(on.includes(name), { force: true });
+      if ((await box.isChecked()) === on.includes(name)) continue;
+      // スマホ幅では、画面の下の端のトグルが下に固定したタブの裏に入るので、真ん中まで動かしてから押す
+      await box.evaluate((e) => e.scrollIntoView({ block: "center" }));
+      await box.setChecked(on.includes(name), { force: true });
     }
   };
   await addChore(phone, async () => {
