@@ -615,7 +615,7 @@
       "number": 27,
       "kind": "task",
       "title": "家事の「やり方」メモ（Markdown）",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [],
       "milestone": null,
@@ -627,7 +627,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-11T13:32:17.993Z",
-      "updatedAt": "2026-10-11T13:32:17.993Z",
+      "updatedAt": "2026-10-11T13:33:38.104Z",
       "closedAt": null,
       "extra": {}
     },
