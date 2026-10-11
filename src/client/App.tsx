@@ -7,7 +7,6 @@ import { FamilyCreate } from "./screens/FamilyCreate";
 import { FamilyScreen } from "./screens/FamilyScreen";
 import { InviteScreen } from "./screens/Invite";
 import { MoreScreen } from "./screens/More";
-import { SoonScreen } from "./screens/Soon";
 import { Login } from "./screens/Login";
 import { Settings } from "./screens/Settings";
 import { Shopping } from "./screens/Shopping";
@@ -18,6 +17,8 @@ import { ChoreForm } from "./screens/ChoreForm";
 import { ChoreTable } from "./screens/ChoreTable";
 import { Chores } from "./screens/Chores";
 import { TicketScreen } from "./screens/Ticket";
+import { TodoDetail } from "./screens/TodoDetail";
+import { Todos } from "./screens/Todos";
 import { Today } from "./screens/Today";
 import { type Nav, type Route, confirmLeave, fixPath, pathOf, routeOf, type Tab, tabOf } from "./router";
 
@@ -227,7 +228,9 @@ export function App() {
       ) : route.name === "more" ? (
         <MoreScreen nav={nav} />
       ) : route.name === "todos" ? (
-        <SoonScreen title="TODO" />
+        <Todos key={family.id} family={family} nav={nav} />
+      ) : route.name === "todo" ? (
+        <TodoDetail key={route.id} id={route.id} family={family} nav={nav} />
       ) : route.name === "shopping" ? (
         <Shopping key={family.id} me={me} family={family} onAuthLost={() => void refreshMe()} />
       ) : route.name === "chores" ? (

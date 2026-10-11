@@ -5,6 +5,8 @@ describe("router", () => {
   it("TODO・買い物・その他の URL", () => {
     for (const r of [{ name: "todos" }, { name: "shopping" }, { name: "more" }] as Route[]) expect(routeOf(pathOf(r))).toEqual(r);
     expect(pathOf({ name: "more" })).toBe("/more");
+    expect(routeOf("/todos/abc")).toEqual({ name: "todo", id: "abc" });
+    expect(pathOf({ name: "todo", id: "abc" })).toBe("/todos/abc");
   });
 
   it("統計・家族・設定は今までの URL のまま", () => {
@@ -15,8 +17,9 @@ describe("router", () => {
 
   it("統計・家族・設定を開いているときのタブは「その他」", () => {
     expect(["/stats", "/family", "/settings", "/more"].map((p) => tabOf(routeOf(p)))).toEqual(["more", "more", "more", "more"]);
-    expect(["/", "/todos", "/shopping", "/chores", "/chores/table", "/chores/x/edit"].map((p) => tabOf(routeOf(p)))).toEqual([
+    expect(["/", "/todos", "/todos/x", "/shopping", "/chores", "/chores/table", "/chores/x/edit"].map((p) => tabOf(routeOf(p)))).toEqual([
       "today",
+      "todos",
       "todos",
       "shopping",
       "chores",

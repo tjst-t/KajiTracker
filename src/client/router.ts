@@ -2,6 +2,7 @@
 export type Route =
   | { name: "today" }
   | { name: "todos" }
+  | { name: "todo"; id: string }
   | { name: "shopping" }
   | { name: "chores" }
   | { name: "chore-new" }
@@ -21,6 +22,8 @@ export function pathOf(r: Route): string {
       return "/";
     case "todos":
       return "/todos";
+    case "todo":
+      return `/todos/${r.id}`;
     case "shopping":
       return "/shopping";
     case "chores":
@@ -52,6 +55,7 @@ export function routeOf(path: string): Route {
   if ((m = /^\/chores\/([^/]+)\/edit$/.exec(path))) return { name: "chore-edit", id: m[1]! };
   if ((m = /^\/chores\/([^/]+)$/.exec(path))) return { name: "chore", id: m[1]! };
   if (path.startsWith("/chores")) return { name: "chores" };
+  if ((m = /^\/todos\/([^/]+)$/.exec(path))) return { name: "todo", id: m[1]! };
   if (path.startsWith("/todos")) return { name: "todos" };
   if (path.startsWith("/shopping")) return { name: "shopping" };
   if (path.startsWith("/more")) return { name: "more" };
@@ -78,6 +82,8 @@ export function tabOf(r: Route): Tab {
     case "shopping":
     case "more":
       return r.name;
+    case "todo":
+      return "todos";
     case "stats":
     case "family":
     case "settings":

@@ -27,20 +27,38 @@ export function HowtoMeta({ chore }: { chore: Pick<ChoreView, "howtoUpdatedAt" |
   );
 }
 
+const HOWTO_PLACEHOLDER = "例：\n## 用意するもの\n- 中性洗剤\n- スポンジ\n\n## 手順\n- [ ] 排水口のふたを外す\n- [ ] **ぬめり**を落とす";
+
 export const howtoLength = (text: string) => [...text].length;
 
 /** やり方を書く欄。PC 幅では左に入力・右にプレビュー、スマホ幅では「書く／見る」を切り替える */
-export function HowtoEditor({ value, onChange, autoFocus }: { value: string; onChange: (v: string) => void; autoFocus?: boolean }) {
-  const [mode, setMode] = useState<"write" | "view">("write");
+export function HowtoEditor({
+  value,
+  onChange,
+  autoFocus,
+  label = "やり方",
+  placeholder = HOWTO_PLACEHOLDER,
+  initialMode = "write",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  autoFocus?: boolean;
+  /** 欄の名前（TODO では「メモ」） */
+  label?: string;
+  placeholder?: string;
+  /** スマホ幅で最初に出す側（書いてあるものを開いたときは「見る」） */
+  initialMode?: "write" | "view";
+}) {
+  const [mode, setMode] = useState<"write" | "view">(initialMode);
   const id = useId();
   const len = howtoLength(value);
   return (
     <div className="howto-editor" data-mode={mode}>
       <div className="howto-editor__head">
         <label htmlFor={`${id}-text`} className="howto-editor__label">
-          やり方（Markdown）
+          {label}（Markdown）
         </label>
-        <div className="segmented howto-editor__tabs" role="tablist" aria-label="やり方の表示">
+        <div className="segmented howto-editor__tabs" role="tablist" aria-label={`${label}の表示`}>
           {(["write", "view"] as const).map((m) => (
             <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)}>
               {m === "write" ? "書く" : "見る"}
@@ -54,7 +72,7 @@ export function HowtoEditor({ value, onChange, autoFocus }: { value: string; onC
           className="howto-editor__text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={"例：\n## 用意するもの\n- 中性洗剤\n- スポンジ\n\n## 手順\n- [ ] 排水口のふたを外す\n- [ ] **ぬめり**を落とす"}
+          placeholder={placeholder}
           autoFocus={autoFocus}
           aria-describedby={`${id}-help`}
           aria-invalid={len > HOWTO_MAX ? true : undefined}

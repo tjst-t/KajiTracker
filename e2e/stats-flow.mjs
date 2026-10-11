@@ -96,7 +96,8 @@ try {
 
   const current = async (page) => (await page.getByRole("navigation", { name: "画面" }).locator('[aria-current="page"]').innerText()).trim();
   for (const [label, path, ready] of [
-    ["TODO", "/todos", () => phone.getByText("準備中です").waitFor()],
+    // TODO の中身は e2e/todos-flow.mjs
+    ["TODO", "/todos", () => phone.getByLabel("TODO を足す").waitFor()],
     // 買い物の中身は e2e/shopping-flow.mjs
     ["買い物", "/shopping", () => phone.getByRole("tablist", { name: "お店" }).waitFor()],
   ]) {
@@ -106,7 +107,7 @@ try {
     if (new URL(phone.url()).pathname !== path) throw new Error(`URL が ${path} でない: ${phone.url()}`);
     if ((await current(phone)) !== label) throw new Error(`${label} のタブが選ばれていない`);
   }
-  ok("TODO は /todos で「準備中です」、買い物は /shopping でお店のリスト");
+  ok("TODO は /todos で「TODO を足す」の欄、買い物は /shopping でお店のリスト");
 
   await nav.getByRole("button", { name: "その他", exact: true }).click();
   await h1(phone, "その他");
