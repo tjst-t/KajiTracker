@@ -727,7 +727,7 @@
       "number": 32,
       "kind": "task",
       "title": "TODO の画面と、今日の画面への組み込み",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [
         "todos-api"
@@ -741,7 +741,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-11T13:33:30.495Z",
-      "updatedAt": "2026-10-11T13:33:30.495Z",
+      "updatedAt": "2026-10-11T23:07:14.812Z",
       "closedAt": null,
       "extra": {}
     }
