@@ -137,11 +137,18 @@ p {
   }
   .tabs button {
     flex: 1;
+    min-width: 0;
     min-height: 2.75rem;
+    padding-inline: 0.25rem;
     font-size: var(--t-body);
+    white-space: nowrap;
   }
   .shell .page {
     padding-bottom: 6rem;
+  }
+  /* 下の固定タブの裏に入力欄が隠れないよう、スクロールで寄せるときはタブの分あける */
+  html {
+    scroll-padding-bottom: 5rem;
   }
 }
 
@@ -895,6 +902,35 @@ select {
   font-size: var(--t-small);
 }
 .crumb a {
+  color: var(--ink-soft);
+}
+
+/* ---- その他：統計・家族・設定への入口 ---- */
+
+.more-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+.more-list a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-height: 2.75rem;
+  padding: 0.875rem 0.25rem;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+.more-list a:hover {
+  background: var(--ground);
+}
+.more-list__title {
+  font-weight: 500;
+}
+.more-list__note {
+  font-size: var(--t-small);
   color: var(--ink-soft);
 }
 .detail-head {

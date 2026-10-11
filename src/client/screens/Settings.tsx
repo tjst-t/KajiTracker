@@ -5,6 +5,8 @@ import { CreatePasskey } from "../components/Passkey";
 import { type IssuedQr, QrDialog } from "../components/QrDialog";
 import { errorText, formatDateTime } from "../format";
 import { type PushState, getPushState, turnOffPush, turnOnPush } from "../push";
+import type { Nav } from "../router";
+import { MoreCrumb } from "./More";
 
 const TIMES = Array.from({ length: 96 }, (_, i) => `${String(Math.floor(i / 4)).padStart(2, "0")}:${String((i % 4) * 15).padStart(2, "0")}`);
 
@@ -22,7 +24,8 @@ function viaText(via: SessionVia, issuedBy: string | null): string {
 }
 
 /** S8 設定（自分）：名前・通知の時刻・パスキー・ログイン中の端末・端末を追加 */
-export function Settings({ me, onChanged, onLoggedOut }: { me: Me; onChanged: () => Promise<void>; onLoggedOut: () => void }) {
+/** nav があれば上に「その他」へ戻るリンクを出す（Family がまだ無いときは出さない） */
+export function Settings({ me, nav, onChanged, onLoggedOut }: { me: Me; nav?: Nav; onChanged: () => Promise<void>; onLoggedOut: () => void }) {
   const [passkeys, setPasskeys] = useState<PasskeyItem[]>([]);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [name, setName] = useState(me.user.displayName);
@@ -58,6 +61,7 @@ export function Settings({ me, onChanged, onLoggedOut }: { me: Me; onChanged: ()
 
   return (
     <main className="page">
+      {nav && <MoreCrumb nav={nav} />}
       <h1>設定</h1>
       {message && (
         <p className={message.kind === "ok" ? "notice notice--ok" : "error"} role={message.kind === "ok" ? "status" : "alert"}>

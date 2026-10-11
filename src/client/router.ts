@@ -1,6 +1,8 @@
 // 画面の行き先と URL。ライブラリは使わず history API だけで持つ
 export type Route =
   | { name: "today" }
+  | { name: "todos" }
+  | { name: "shopping" }
   | { name: "chores" }
   | { name: "chore-new" }
   | { name: "chore-table" }
@@ -8,7 +10,8 @@ export type Route =
   | { name: "chore-edit"; id: string }
   | { name: "stats" }
   | { name: "family" }
-  | { name: "settings" };
+  | { name: "settings" }
+  | { name: "more" };
 
 export type Nav = { route: Route; go: (r: Route) => void; back: (fallback: Route) => void };
 
@@ -16,6 +19,10 @@ export function pathOf(r: Route): string {
   switch (r.name) {
     case "today":
       return "/";
+    case "todos":
+      return "/todos";
+    case "shopping":
+      return "/shopping";
     case "chores":
       return "/chores";
     case "chore-new":
@@ -32,6 +39,8 @@ export function pathOf(r: Route): string {
       return "/family";
     case "settings":
       return "/settings";
+    case "more":
+      return "/more";
   }
 }
 
@@ -43,6 +52,9 @@ export function routeOf(path: string): Route {
   if ((m = /^\/chores\/([^/]+)\/edit$/.exec(path))) return { name: "chore-edit", id: m[1]! };
   if ((m = /^\/chores\/([^/]+)$/.exec(path))) return { name: "chore", id: m[1]! };
   if (path.startsWith("/chores")) return { name: "chores" };
+  if (path.startsWith("/todos")) return { name: "todos" };
+  if (path.startsWith("/shopping")) return { name: "shopping" };
+  if (path.startsWith("/more")) return { name: "more" };
   if (path.startsWith("/stats")) return { name: "stats" };
   if (path.startsWith("/family")) return { name: "family" };
   if (path.startsWith("/settings")) return { name: "settings" };
@@ -56,13 +68,23 @@ export function fixPath(r: Route): Route {
   return r;
 }
 
-/** タブ（今日・家事・統計・家族・設定）のどれに当たるか */
-export function tabOf(r: Route): "today" | "chores" | "stats" | "family" | "settings" {
-  if (r.name === "today") return "today";
-  if (r.name === "stats") return "stats";
-  if (r.name === "family") return "family";
-  if (r.name === "settings") return "settings";
-  return "chores";
+export type Tab = "today" | "todos" | "shopping" | "chores" | "more";
+
+/** タブ（今日・TODO・買い物・家事・その他）のどれに当たるか。統計・家族・設定は「その他」の中 */
+export function tabOf(r: Route): Tab {
+  switch (r.name) {
+    case "today":
+    case "todos":
+    case "shopping":
+    case "more":
+      return r.name;
+    case "stats":
+    case "family":
+    case "settings":
+      return "more";
+    default:
+      return "chores";
+  }
 }
 
 /** 保存していない変更があるときに出す確かめ（表で編集）。null なら確かめない */

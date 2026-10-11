@@ -3,12 +3,14 @@ import { type Family, type Me, type Member, api } from "../api";
 import { withStepUp } from "../auth";
 import { type IssuedQr, QrDialog } from "../components/QrDialog";
 import { errorText } from "../format";
+import type { Nav } from "../router";
 import { FamilyCreateForm } from "./FamilyCreate";
+import { MoreCrumb } from "./More";
 
 type Dialog = { kind: "invite" } | { kind: "recovery"; member: Member } | null;
 
 /** S6 Family：メンバーと役割、招待、回復の札、抜ける・外す、名前の変更、削除。S7 の「新しく作る」もここに置く */
-export function FamilyScreen(props: { me: Me; family: Family; onFamiliesChanged: (select?: string) => Promise<void> }) {
+export function FamilyScreen(props: { me: Me; family: Family; nav: Nav; onFamiliesChanged: (select?: string) => Promise<void> }) {
   const { family } = props;
   const isAdmin = family.role === "admin";
   const [members, setMembers] = useState<Member[]>([]);
@@ -48,6 +50,7 @@ export function FamilyScreen(props: { me: Me; family: Family; onFamiliesChanged:
 
   return (
     <main className="page">
+      <MoreCrumb nav={props.nav} />
       <h1>{family.name}</h1>
       {message && (
         <p className={message.kind === "ok" ? "notice notice--ok" : "error"} role={message.kind === "ok" ? "status" : "alert"}>

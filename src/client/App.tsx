@@ -6,6 +6,8 @@ import { errorText } from "./format";
 import { FamilyCreate } from "./screens/FamilyCreate";
 import { FamilyScreen } from "./screens/FamilyScreen";
 import { InviteScreen } from "./screens/Invite";
+import { MoreScreen } from "./screens/More";
+import { SoonScreen } from "./screens/Soon";
 import { Login } from "./screens/Login";
 import { Settings } from "./screens/Settings";
 import { StatsScreen } from "./screens/Stats";
@@ -15,18 +17,19 @@ import { ChoreTable } from "./screens/ChoreTable";
 import { Chores } from "./screens/Chores";
 import { TicketScreen } from "./screens/Ticket";
 import { Today } from "./screens/Today";
-import { type Nav, type Route, confirmLeave, fixPath, pathOf, routeOf, tabOf } from "./router";
+import { type Nav, type Route, confirmLeave, fixPath, pathOf, routeOf, type Tab, tabOf } from "./router";
 
 // 札・招待はページを開いた瞬間に URL から抜いておく（描画より前に）
 const initialFragment = takeFragmentFromUrl();
 
-const TABS = [
+// 家事は登録したら触ることが少ないので4番目。統計・家族・設定は「その他」の中
+const TABS: [Tab, string][] = [
   ["today", "今日"],
+  ["todos", "TODO"],
+  ["shopping", "買い物"],
   ["chores", "家事"],
-  ["stats", "統計"],
-  ["family", "家族"],
-  ["settings", "設定"],
-] as const;
+  ["more", "その他"],
+];
 
 const FAMILY_KEY = "kaji.currentFamily";
 
@@ -175,11 +178,17 @@ export function App() {
         </nav>
       </header>
       {route.name === "settings" || !family ? (
-        <Settings me={me} onChanged={refreshMe} onLoggedOut={() => setMe(null)} />
+        <Settings me={me} nav={family ? nav : undefined} onChanged={refreshMe} onLoggedOut={() => setMe(null)} />
       ) : route.name === "family" ? (
-        <FamilyScreen me={me} family={family} onFamiliesChanged={loadFamilies} />
+        <FamilyScreen me={me} family={family} nav={nav} onFamiliesChanged={loadFamilies} />
       ) : route.name === "stats" ? (
-        <StatsScreen family={family} />
+        <StatsScreen family={family} nav={nav} />
+      ) : route.name === "more" ? (
+        <MoreScreen nav={nav} />
+      ) : route.name === "todos" ? (
+        <SoonScreen title="TODO" />
+      ) : route.name === "shopping" ? (
+        <SoonScreen title="買い物" />
       ) : route.name === "chores" ? (
         <Chores family={family} nav={nav} />
       ) : route.name === "chore-table" ? (

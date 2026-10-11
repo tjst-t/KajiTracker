@@ -4,6 +4,8 @@ import { shortDate } from "../../shared/describe";
 import { STATS_MIN_DATE, type Stats, monthRange } from "../../shared/stats";
 import { type Family, api } from "../api";
 import { errorText } from "../format";
+import type { Nav } from "../router";
+import { MoreCrumb } from "./More";
 
 type StatsResponse = Stats & { today: DateStr };
 
@@ -32,7 +34,7 @@ const OTHER_TONE = "#c9d1cb";
 const WEEKS_SHOWN = 26;
 
 /** S5 統計：期間の切り替え、分担、担当の偏り、守れた率と平均の遅れ、推移、よく遅れる家事 */
-export function StatsScreen({ family }: { family: Family }) {
+export function StatsScreen({ family, nav }: { family: Family; nav: Nav }) {
   const [period, setPeriod] = useState<Period>("month");
   const [data, setData] = useState<StatsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +56,7 @@ export function StatsScreen({ family }: { family: Family }) {
 
   return (
     <main className="page page--wide stats">
+      <MoreCrumb nav={nav} />
       <h1>統計</h1>
       <div className="segmented stats__period" role="tablist" aria-label="期間">
         {PERIODS.map(([p, label]) => (

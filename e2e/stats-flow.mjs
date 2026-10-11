@@ -21,6 +21,11 @@ const browser = await chromium.launch();
 const errors = [];
 let step = "";
 const ok = (s) => console.log(`ok: ${s}`);
+/** 統計・家族・設定は「その他」タブの中から開く */
+async function openMore(page, name) {
+  await page.getByRole("button", { name: "その他", exact: true }).click();
+  await page.getByRole("link", { name: new RegExp(`^${name}`) }).click();
+}
 
 async function device(viewport) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, locale: "ja-JP" });
@@ -74,18 +79,59 @@ try {
 
   // ---- タブ：スマホの下の固定タブに5つ並ぶ ----
   step = "tabs";
-  const tabs = phone.getByRole("navigation", { name: "画面" }).getByRole("button");
+  const nav = phone.getByRole("navigation", { name: "画面" });
+  const tabs = nav.getByRole("button");
   const labels = await tabs.allInnerTexts();
-  if (labels.join(",") !== "今日,家事,統計,家族,設定") throw new Error(`タブの並びが違う: ${labels}`);
+  if (labels.join(",") !== "今日,TODO,買い物,家事,その他") throw new Error(`タブの並びが違う: ${labels}`);
+  const boxes = [];
   for (const t of await tabs.all()) {
     const b = await t.boundingBox();
-    if (!b || b.x < 0 || b.x + b.width > 390 || b.height > 56) throw new Error(`タブが収まっていない: ${JSON.stringify(b)}`);
+    if (!b || b.x < 0 || b.x + b.width > 390 || b.height < 44 || b.height > 56 || b.width < 44) throw new Error(`タブが収まっていない: ${JSON.stringify(b)}`);
+    boxes.push(b);
   }
-  ok("タブは「今日・家事・統計・家族・設定」、390px でも1行に収まる");
+  if (new Set(boxes.map((b) => Math.round(b.y))).size !== 1) throw new Error(`タブが1行に並んでいない: ${JSON.stringify(boxes)}`);
+  await noOverflow(phone, "今日（スマホ）");
+  await phone.screenshot({ path: `${SHOTS}/19-tabs-phone.png` });
+  ok("タブは「今日・TODO・買い物・家事・その他」、390px でも1行に収まり、どれも 44px 以上");
+
+  const current = async (page) => (await page.getByRole("navigation", { name: "画面" }).locator('[aria-current="page"]').innerText()).trim();
+  for (const [label, path] of [
+    ["TODO", "/todos"],
+    ["買い物", "/shopping"],
+  ]) {
+    await nav.getByRole("button", { name: label, exact: true }).click();
+    await h1(phone, label);
+    await phone.getByText("準備中です").waitFor();
+    if (new URL(phone.url()).pathname !== path) throw new Error(`URL が ${path} でない: ${phone.url()}`);
+    if ((await current(phone)) !== label) throw new Error(`${label} のタブが選ばれていない`);
+  }
+  ok("TODO・買い物は /todos・/shopping で「準備中です」");
+
+  await nav.getByRole("button", { name: "その他", exact: true }).click();
+  await h1(phone, "その他");
+  if (new URL(phone.url()).pathname !== "/more") throw new Error(`URL が /more でない: ${phone.url()}`);
+  await phone.screenshot({ path: `${SHOTS}/19-more-phone.png` });
+  for (const [label, path, heading] of [
+    ["設定", "/settings", "設定"],
+    ["家族", "/family", family],
+    ["統計", "/stats", "統計"],
+  ]) {
+    await openMore(phone, label);
+    await h1(phone, heading);
+    if (new URL(phone.url()).pathname !== path) throw new Error(`URL が ${path} でない: ${phone.url()}`);
+    if ((await current(phone)) !== "その他") throw new Error(`${label} を開いたのに「その他」のタブが選ばれていない`);
+    await phone.locator(".crumb").getByRole("link", { name: "その他" }).click();
+    await h1(phone, "その他");
+    // 前からの URL を直に開いても同じ画面・同じタブ
+    await phone.goto(`${BASE}${path}`);
+    await h1(phone, heading);
+    if ((await current(phone)) !== "その他") throw new Error(`${path} を直に開いたのに「その他」のタブが選ばれていない`);
+  }
+  ok("その他から統計・家族・設定へ行けて、そのときのタブは「その他」。上の「その他」で戻れる。/stats・/family・/settings もそのまま開ける");
 
   // ---- 空の統計 ----
   step = "empty";
-  await phone.getByRole("button", { name: "統計", exact: true }).click();
+  await openMore(phone, "統計");
   await h1(phone, "統計");
   if (!phone.url().endsWith("/stats")) throw new Error(`URL が /stats でない: ${phone.url()}`);
   await phone.getByText("この期間はまだ記録がありません").waitFor();
@@ -94,7 +140,7 @@ try {
 
   // ---- 家族を招待（はなこ） ----
   step = "invite";
-  await phone.getByRole("button", { name: "家族", exact: true }).click();
+  await openMore(phone, "家族");
   await h1(phone, family);
   await phone.getByRole("button", { name: "家族を招待" }).click();
   const inviteLink = await phone.getByLabel("家族を招待のリンク").inputValue();
@@ -104,7 +150,7 @@ try {
   await wife.getByLabel("名前").fill("はなこ");
   await wife.getByRole("button", { name: "次へ" }).click();
   await wife.getByRole("button", { name: "パスキーを作って参加する" }).click();
-  await wife.getByRole("button", { name: "統計", exact: true }).waitFor();
+  await wife.getByRole("button", { name: "その他", exact: true }).waitFor();
   ok("はなこが参加");
 
   // ---- 家事と記録を入れる（過去80日ぶん） ----
@@ -126,7 +172,7 @@ try {
 
   // ---- 統計（スマホ） ----
   step = "stats-phone";
-  await phone.getByRole("button", { name: "統計", exact: true }).click();
+  await openMore(phone, "統計");
   await phone.reload();
   await h1(phone, "統計");
   for (const name of ["分担", "家事ごとの担当", "期限の守り具合", "回数の推移", "よく遅れる家事"]) await phone.getByRole("heading", { level: 2, name }).waitFor();
@@ -157,7 +203,16 @@ try {
   await pcPage.getByText("月ごと", { exact: true }).waitFor();
   await noOverflow(pcPage, "統計（PC）");
   await pcPage.screenshot({ path: `${SHOTS}/23-stats-pc.png`, fullPage: true });
+  const pcTabs = await pcPage.getByRole("navigation", { name: "画面" }).getByRole("button").all();
+  const pcBoxes = await Promise.all(pcTabs.map((t) => t.boundingBox()));
+  if (new Set(pcBoxes.map((b) => Math.round(b.y))).size !== 1 || pcBoxes.some((b) => b.y > 100)) throw new Error(`PC のタブがヘッダーに1行で並んでいない: ${JSON.stringify(pcBoxes)}`);
+  if ((await current(pcPage)) !== "その他") throw new Error("PC で統計を開いたのに「その他」のタブが選ばれていない");
   ok("統計：1280px でも崩れない");
+  await pcPage.getByRole("button", { name: "その他", exact: true }).click();
+  await h1(pcPage, "その他");
+  await noOverflow(pcPage, "その他（PC）");
+  await pcPage.screenshot({ path: `${SHOTS}/23-more-pc.png` });
+  ok("PC ではタブがヘッダーの右に1行で並び、その他の画面も崩れない");
 
   // ---- 家事の詳細：実施カレンダー ----
   step = "calendar";

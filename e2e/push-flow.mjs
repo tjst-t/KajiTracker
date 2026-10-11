@@ -21,6 +21,11 @@ const browser = await chromium.launch({ channel: "chromium" });
 const errors = [];
 let step = "";
 const ok = (s) => console.log(`ok: ${s}`);
+/** 統計・家族・設定は「その他」タブの中から開く */
+async function openMore(page, name) {
+  await page.getByRole("button", { name: "その他", exact: true }).click();
+  await page.getByRole("link", { name: new RegExp(`^${name}`) }).click();
+}
 
 async function device(options) {
   const ctx = await browser.newContext({ deviceScaleFactor: 2, locale: "ja-JP", ...options });
@@ -45,7 +50,7 @@ async function signUpAndOpenSettings(page, name) {
   await page.getByLabel("Family の名前").fill(`通知テスト${Date.now() % 10000}`);
   await page.getByRole("button", { name: "Family を作る" }).click();
   await page.getByRole("heading", { name: "まだ家事がありません" }).waitFor();
-  await page.getByRole("button", { name: "設定", exact: true }).click();
+  await openMore(page, "設定");
   await page.getByRole("heading", { level: 1, name: "設定" }).waitFor();
 }
 

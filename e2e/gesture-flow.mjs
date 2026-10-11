@@ -59,6 +59,11 @@ const browser = await chromium.launch();
 const errors = [];
 let step = "";
 const ok = (s) => console.log(`ok: ${s}`);
+/** 統計・家族・設定は「その他」タブの中から開く */
+async function openMore(page, name) {
+  await page.getByRole("button", { name: "その他", exact: true }).click();
+  await page.getByRole("link", { name: new RegExp(`^${name}`) }).click();
+}
 const STEP_UP_STEPS = ["settings-passkey", "step-up"];
 
 async function device() {
@@ -117,7 +122,7 @@ try {
 
   // ---- ログイン ----
   step = "login";
-  await phone.getByRole("button", { name: "設定", exact: true }).click();
+  await openMore(phone, "設定");
   await phone.getByRole("button", { name: "ログアウト" }).click();
   await phone.getByRole("button", { name: "パスキーでログイン" }).click();
   await h1(phone, "設定");
@@ -154,7 +159,7 @@ try {
 
   // ---- 招待：名前 →「次へ」→「パスキーを作って参加する」 ----
   step = "invite-new";
-  await phone.getByRole("button", { name: "家族", exact: true }).click();
+  await openMore(phone, "家族");
   await h1(phone, family);
   await phone.getByRole("button", { name: "家族を招待" }).click();
   const invite1 = await phone.getByLabel("家族を招待のリンク").inputValue();
@@ -176,7 +181,7 @@ try {
   await phone.getByRole("button", { name: "家族を招待" }).click();
   const invite2 = await phone.getByLabel("家族を招待のリンク").inputValue();
   await phone.getByRole("button", { name: "閉じる" }).click();
-  await wife.getByRole("button", { name: "設定", exact: true }).click();
+  await openMore(wife, "設定");
   await wife.getByRole("button", { name: "ログアウト" }).click();
   await wife.getByRole("button", { name: "パスキーでログイン" }).waitFor();
   await wife.evaluate(() => window.__gesture.splice(0));

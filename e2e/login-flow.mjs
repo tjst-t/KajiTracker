@@ -26,6 +26,11 @@ const browser = await chromium.launch();
 const errors = [];
 let step = "";
 const ok = (s) => console.log(`ok: ${s}`);
+/** 統計・家族・設定は「その他」タブの中から開く */
+async function openMore(page, name) {
+  await page.getByRole("button", { name: "その他", exact: true }).click();
+  await page.getByRole("link", { name: new RegExp(`^${name}`) }).click();
+}
 
 async function device(viewport, userAgent) {
   const ctx = await browser.newContext({ viewport, userAgent, deviceScaleFactor: 2 });
@@ -64,7 +69,7 @@ try {
 
   // ---- 端末を追加（PC） ----
   step = "add-device";
-  await phone.getByRole("button", { name: "設定", exact: true }).click();
+  await openMore(phone, "設定");
   await phone.getByRole("button", { name: "端末を追加" }).click();
   await phone.getByAltText("端末を追加の QR コード").waitFor();
   await phone.screenshot({ path: `${SHOTS}/03-add-device.png` });
@@ -80,7 +85,7 @@ try {
 
   // ---- 家族を招待（妻・初めて） ----
   step = "invite";
-  await phone.getByRole("button", { name: "家族", exact: true }).click();
+  await openMore(phone, "家族");
   await h1(phone, family);
   await phone.getByRole("button", { name: "家族を招待" }).click();
   await phone.getByAltText("家族を招待の QR コード").waitFor();
@@ -115,7 +120,7 @@ try {
   await todayOf(wifeNew, family);
   await phone.getByText(/iPhone の Safariで入りました/).waitFor({ timeout: 10000 });
   await phone.getByRole("button", { name: "閉じる" }).click();
-  await wifeNew.getByRole("button", { name: "設定", exact: true }).click();
+  await openMore(wifeNew, "設定");
   await wifeNew.getByText("たくみさんが出した札で入った").waitFor();
   ok("妻を管理者に → 回復の札で妻の新しい iPhone が入る（「たくみさんが出した札」と残る）");
   await phone.screenshot({ path: `${SHOTS}/07-family.png`, fullPage: true });
@@ -135,16 +140,16 @@ try {
 
   // ---- ログアウトしてパスキーでログイン ----
   step = "relogin";
-  await phone.getByRole("button", { name: "設定", exact: true }).click();
+  await openMore(phone, "設定");
   await phone.getByRole("button", { name: "ログアウト" }).click();
   await phone.getByRole("button", { name: "パスキーでログイン" }).click();
   await h1(phone, "設定");
-  await wife.getByRole("button", { name: "設定", exact: true }).click();
+  await openMore(wife, "設定");
   await wife.getByRole("button", { name: "ログアウト" }).click();
   await wife.getByRole("button", { name: "パスキーでログイン" }).click();
   await h1(wife, "設定");
   ok("たくみ・妻とも、ログアウトしてパスキーでログインし直せる");
-  await pc.getByRole("button", { name: "家族", exact: true }).click();
+  await openMore(pc, "家族");
   await h1(pc, family);
   await pc.screenshot({ path: `${SHOTS}/09-family-pc.png`, fullPage: true });
 } catch (e) {
