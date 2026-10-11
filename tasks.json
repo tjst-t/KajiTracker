@@ -704,7 +704,7 @@
       "number": 31,
       "kind": "task",
       "title": "一回限りの TODO（サブタスク1段）：テーブルと API・通知",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [
         "shopping-lists"
@@ -718,7 +718,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-11T13:33:28.399Z",
-      "updatedAt": "2026-10-11T13:33:28.399Z",
+      "updatedAt": "2026-10-11T14:34:49.723Z",
       "closedAt": null,
       "extra": {}
     },
