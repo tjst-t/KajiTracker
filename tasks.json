@@ -771,7 +771,7 @@
       "number": 34,
       "kind": "task",
       "title": "完了の演出を派手にし、「皆済」を「花丸＋よくできました」に替える",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [],
       "milestone": null,
@@ -783,7 +783,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-15T10:55:47.576Z",
-      "updatedAt": "2026-10-15T10:55:47.576Z",
+      "updatedAt": "2026-10-15T10:55:49.797Z",
       "closedAt": null,
       "extra": {}
     }
