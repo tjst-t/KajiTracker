@@ -750,7 +750,7 @@
       "number": 33,
       "kind": "task",
       "title": "完了の演出（1件は控えめな判子、全部済んだら「皆済」と紙吹雪）",
-      "status": "ready",
+      "status": "in-progress",
       "parent": null,
       "dependsOn": [],
       "milestone": null,
@@ -762,7 +762,7 @@
       "refs": [],
       "threads": [],
       "createdAt": "2026-10-15T10:20:58.166Z",
-      "updatedAt": "2026-10-15T10:20:58.166Z",
+      "updatedAt": "2026-10-15T10:21:00.710Z",
       "closedAt": null,
       "extra": {}
     }
