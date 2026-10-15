@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { shortDate } from "../../shared/describe";
 import { type Family, type Group, type Member, api } from "../api";
+import { popCheck } from "../celebrate";
 import { Hanko } from "../components/Fuda";
 import { HOWTO_MAX, HowtoEditor, howtoLength } from "../components/Howto";
 import { Progress, useAskDone } from "../components/TodoParts";
@@ -290,7 +291,10 @@ function Subtasks({
                 aria-pressed={s.done}
                 aria-label={s.done ? `「${s.title}」を未完了に戻す` : `「${s.title}」を済みにする`}
                 disabled={busy}
-                onClick={() => void run(() => api("PATCH", `/subtasks/${s.id}`, { done: !s.done }))}
+                onClick={(e) => {
+                  if (!s.done) popCheck(e.currentTarget);
+                  void run(() => api("PATCH", `/subtasks/${s.id}`, { done: !s.done }));
+                }}
               >
                 <span className="memo__check" aria-hidden="true" />
               </button>

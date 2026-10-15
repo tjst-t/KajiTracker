@@ -202,6 +202,10 @@ try {
   await phone.screenshot({ path: `${SHOTS}/54-today-ask.png` });
   await ask.getByRole("button", { name: "はい、まとめて済みにする" }).click();
   await fuda.getByRole("button", { name: "取り消す" }).waitFor();
+  // 今日の「やること」はこの札だけなので、全部済んだ「皆済」が出る（中身は celebration-flow で確かめる）
+  const kaisai = phone.getByRole("dialog", { name: "今日の当番、ぜんぶ済みました" });
+  await kaisai.getByRole("button", { name: "閉じる" }).click();
+  await kaisai.waitFor({ state: "hidden" });
   await phone.waitForTimeout(700);
   await phone.screenshot({ path: `${SHOTS}/55-today-flipped.png` });
   await phone.waitForTimeout(7000);

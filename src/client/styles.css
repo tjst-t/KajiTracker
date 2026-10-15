@@ -709,6 +709,9 @@ select {
   .fuda--back {
     transform: none;
   }
+  .fuda-wrap:not(.is-done) .fuda--back {
+    visibility: hidden;
+  }
 }
 
 /* ---- 家事の一覧 ---- */
@@ -2499,4 +2502,275 @@ select {
 .subtask__actions .memo__remove {
   align-self: stretch;
   min-height: 2.75rem;
+}
+
+/* ---- 完了の演出 ----
+   1件済ませたとき：「済」の判子が押される（少し大きく傾いて現れ、ぽんと縮んで止まる）。まわりに若竹のにじみ、札の枠が短く光る。
+   全部済んだとき：朱の大きな判子「皆済」と紙吹雪（canvas）。動かすのは transform と opacity だけ。
+   動きを減らす設定では上の「* { animation: none }」で止まる。演出オフでは動きのクラスを付けない */
+.hanko--done.is-stamping {
+  position: relative;
+  /* 札が裏返って、裏の面が見えてきたところで押す */
+  animation: stamp-press 0.4s cubic-bezier(0.2, 0.8, 0.3, 1) 0.24s both;
+}
+.hanko--done.is-stamping::after {
+  /* にじむインクの輪 */
+  content: "";
+  position: absolute;
+  inset: -0.5rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 48%, rgb(79 127 90 / 0.45) 58%, rgb(79 127 90 / 0.15) 66%, transparent 72%);
+  opacity: 0;
+  pointer-events: none;
+  animation: ink-ring 0.6s ease-out 0.46s;
+}
+@keyframes stamp-press {
+  0% {
+    opacity: 0;
+    transform: scale(1.9) rotate(-22deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.88) rotate(-7deg);
+  }
+  78% {
+    transform: scale(1.06) rotate(-9.5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-9deg);
+  }
+}
+@keyframes ink-ring {
+  0% {
+    opacity: 1;
+    transform: scale(0.75);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+.is-stamped .fuda--back::after {
+  /* 札の枠が短く若竹に光る */
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 0.375rem;
+  box-shadow:
+    0 0 0 3px var(--wakatake),
+    0 0 1rem 0.25rem rgb(79 127 90 / 0.5);
+  opacity: 0;
+  pointer-events: none;
+  animation: fuda-glow 0.8s ease-out 0.46s;
+}
+@keyframes fuda-glow {
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* TODO の一覧で済みにしたとき：下の「取り消す」の帯に小さな「済」 */
+.undo-bar .hanko--done {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-width: 2px;
+  color: var(--wakatake-tint);
+}
+.undo-bar .hanko--done b {
+  font-size: 1rem;
+}
+.undo-bar .hanko--done.is-stamping {
+  animation-delay: 0s;
+}
+.undo-bar .hanko--done.is-stamping::after {
+  animation-delay: 0.22s;
+}
+
+/* 見出しの横の「今日 3/5」と細い棒 */
+.day-progress {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--t-small);
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.day-progress__num b {
+  display: inline-block;
+  color: var(--ink);
+}
+.day-progress.is-full .day-progress__num b {
+  color: var(--wakatake);
+}
+.day-progress__num b.is-bumping {
+  animation: num-up 0.35s cubic-bezier(0.2, 0.8, 0.3, 1.3);
+}
+@keyframes num-up {
+  0% {
+    opacity: 0;
+    transform: translateY(0.6em);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+.day-progress__track {
+  width: 4rem;
+  height: 0.25rem;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.day-progress__bar {
+  display: block;
+  height: 100%;
+  background: var(--wakatake);
+  transform-origin: left;
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* サブタスク・買い物のチェック：丸に「✓」が押される */
+.is-popping .memo__check {
+  animation: check-pop 0.25s cubic-bezier(0.2, 0.8, 0.3, 1.4);
+}
+@keyframes check-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* 今日の画面：済ませたあとの静かな皆済 */
+.all-clear--kaisai {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+.all-clear__seal {
+  flex: none;
+  width: 3.5rem;
+  height: 3.5rem;
+  color: var(--shu);
+  transform: rotate(-8deg);
+}
+
+/* 皆済の画面：画面全体を少し暗くし、中央に生成りの紙と朱の判子 */
+.kaisai {
+  margin: 0;
+  padding: 1rem;
+  border: 0;
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  background: transparent;
+  color: var(--ink);
+  overflow: hidden;
+}
+.kaisai[open] {
+  display: grid;
+  place-items: center;
+}
+.kaisai::backdrop {
+  background: rgb(34 48 44 / 0.55);
+}
+.kaisai__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: min(22rem, 100%);
+  padding: 1.75rem 1.5rem 1.5rem;
+  border-radius: 1rem;
+  background: #f4efe4;
+  text-align: center;
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 0.25);
+}
+.kaisai__seal {
+  width: min(48vw, 11rem);
+  height: auto;
+  color: var(--shu);
+  display: block;
+  transform: rotate(-8deg);
+}
+.kaisai__title {
+  font-size: var(--t-h2);
+  margin: 0;
+}
+.kaisai__count {
+  margin: 0 0 1rem;
+  color: var(--ink-soft);
+}
+.kaisai__who {
+  display: block;
+  color: var(--ink);
+  font-weight: 700;
+}
+.kaisai__close {
+  min-width: 10rem;
+}
+.kaisai__confetti {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+.kaisai.is-moving::backdrop {
+  animation: fade-in 0.25s ease-out;
+}
+.kaisai.is-moving .kaisai__body {
+  animation: fade-in 0.2s ease-out;
+}
+.kaisai.is-moving .kaisai__seal {
+  /* 上から押される：ちょっと大きく → ドンと止まる */
+  animation: kaisai-press 0.5s cubic-bezier(0.3, 0.7, 0.35, 1) both;
+}
+.kaisai.is-moving .kaisai__title,
+.kaisai.is-moving .kaisai__count,
+.kaisai.is-moving .kaisai__close {
+  animation: fade-up 0.35s ease-out 0.4s both;
+}
+@keyframes kaisai-press {
+  0% {
+    opacity: 0;
+    transform: translateY(-3rem) scale(1.7) rotate(-16deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.92) rotate(-7deg);
+  }
+  80% {
+    transform: scale(1.03) rotate(-8.5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-8deg);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+.kaisai__seal-wrap {
+  margin-bottom: 0.75rem;
 }

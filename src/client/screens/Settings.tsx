@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Me, type PasskeyItem, type SessionItem, type SessionVia, api } from "../api";
 import { withStepUp } from "../auth";
+import { useCelebrationSetting } from "../celebrate";
 import { CreatePasskey } from "../components/Passkey";
 import { type IssuedQr, QrDialog } from "../components/QrDialog";
 import { errorText, formatDateTime } from "../format";
@@ -101,6 +102,7 @@ export function Settings({ me, nav, onChanged, onLoggedOut }: { me: Me; nav?: Na
           </select>
         </label>
         <PushToggle />
+        <CelebrationToggle />
       </section>
 
       <section className="section" aria-labelledby="s-passkeys">
@@ -241,6 +243,20 @@ function CreatePasskeyDialog({ onCreated, onClose }: { onCreated: () => void; on
 }
 
 /** この端末で通知を受けるかのオン・オフ。いまの状態（許可済み・拒否・未対応）に合わせて出し分ける */
+/** 完了の演出（判子の動き・紙吹雪・振動）。この端末だけの設定 */
+function CelebrationToggle() {
+  const [on, set] = useCelebrationSetting();
+  return (
+    <div className="field">
+      <label className="check">
+        <input type="checkbox" checked={on} onChange={(e) => set(e.target.checked)} />
+        完了の演出
+      </label>
+      <p className="muted">済ませたときの判子の動き・紙吹雪・振動。この端末だけの設定です。オフにすると、判子は動かずに出ます。</p>
+    </div>
+  );
+}
+
 function PushToggle() {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { diffDays } from "../../shared/date";
 import { shortDate } from "../../shared/describe";
 import type { ChoreView, LogView } from "../chores";
+import { useMotion } from "../celebrate";
 import { type TodoView, dateOfIso, dueOf } from "../todos";
 import { Progress } from "./TodoParts";
 
@@ -27,6 +28,19 @@ export function Hanko({ chore, today }: { chore: Due; today: string }) {
   return null;
 }
 
+/**
+ * 済ませた印「済」。動かしてよいときは、少し大きく傾いて現れ、ぽんと縮んで止まる（押される動き）。
+ * まわりに若竹のインクのにじみが1回広がる。札の裏では、札の枠も短く光る（.is-stamped）
+ */
+export function DoneStamp() {
+  const motion = useMotion();
+  return (
+    <span className={`hanko hanko--done${motion ? " is-stamping" : ""}`} aria-hidden="true">
+      <b>済</b>
+    </span>
+  );
+}
+
 export function lastText(log: LogView | null): string {
   return log ? `前回 ${shortDate(log.doneOn)} ${log.userName}` : "まだ記録がありません";
 }
@@ -47,12 +61,13 @@ export function Fuda(props: {
   onHowto?: () => void;
 }) {
   const { chore, done } = props;
+  const motion = useMotion();
   const meta: ReactNode[] = [];
   if (chore.assigneeName) meta.push(<span key="a">担当 {chore.assigneeName}</span>);
   meta.push(<span key="l">{lastText(chore.lastLog)}</span>);
 
   return (
-    <li className={`fuda-wrap${done ? " is-done" : ""}`}>
+    <li className={`fuda-wrap${done ? " is-done" : ""}${done && motion ? " is-stamped" : ""}`}>
       <div className="fuda-inner">
         <article className={`fuda fuda--${chore.status}`} aria-hidden={!!done}>
           <div className="fuda__body">
@@ -87,9 +102,7 @@ export function Fuda(props: {
         <article className="fuda fuda--back" aria-hidden={!done} aria-live="polite">
           {done && (
             <>
-              <span className="hanko hanko--done" aria-hidden="true">
-                <b>済</b>
-              </span>
+              <DoneStamp />
               <div className="fuda__body">
                 <p className="fuda__name">{chore.name}</p>
                 <p className="fuda__meta">
@@ -122,12 +135,13 @@ export function TodoFuda(props: {
   onUndo: () => void;
 }) {
   const { todo, done } = props;
+  const motion = useMotion();
   const meta: ReactNode[] = [];
   if (todo.assigneeName) meta.push(<span key="a">担当 {todo.assigneeName}</span>);
   if (todo.hasMemo) meta.push(<span key="m">メモあり</span>);
 
   return (
-    <li className={`fuda-wrap fuda-wrap--todo${done ? " is-done" : ""}`}>
+    <li className={`fuda-wrap fuda-wrap--todo${done ? " is-done" : ""}${done && motion ? " is-stamped" : ""}`}>
       <div className="fuda-inner">
         <article className={`fuda fuda--todo fuda--${todo.dueStatus ?? "none"}`} aria-hidden={!!done}>
           <span className="fuda__kind">TODO</span>
@@ -160,9 +174,7 @@ export function TodoFuda(props: {
         <article className="fuda fuda--back" aria-hidden={!done} aria-live="polite">
           {done && (
             <>
-              <span className="hanko hanko--done" aria-hidden="true">
-                <b>済</b>
-              </span>
+              <DoneStamp />
               <div className="fuda__body">
                 <p className="fuda__name">{todo.title}</p>
                 <p className="fuda__meta">

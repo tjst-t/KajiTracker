@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ApiError, type Family, type Me, api } from "../api";
+import { popCheck } from "../celebrate";
 import { errorText } from "../format";
 import { type FrequentItem, type ShoppingItem, type ShoppingListSummary, type ShoppingListView, type ShoppingOp, applyOps, newItemId } from "../shopping";
 import {
@@ -460,7 +461,14 @@ function ItemSections({
                   </form>
                 ) : (
                   <>
-                    <button className="memo__toggle" aria-pressed={i.status === "in_cart"} onClick={() => onToggle(i)}>
+                    <button
+                      className="memo__toggle"
+                      aria-pressed={i.status === "in_cart"}
+                      onClick={(e) => {
+                        if (i.status === "open") popCheck(e.currentTarget);
+                        onToggle(i);
+                      }}
+                    >
                       <span className="memo__check" aria-hidden="true" />
                       <span className="memo__text">
                         <span className="memo__name">{i.name}</span>

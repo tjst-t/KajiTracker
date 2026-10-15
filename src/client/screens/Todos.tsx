@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { shortDate } from "../../shared/describe";
 import { type Family, type Group, api } from "../api";
-import { Hanko } from "../components/Fuda";
+import { buzz } from "../celebrate";
+import { DoneStamp, Hanko } from "../components/Fuda";
 import { Progress, useAskDone } from "../components/TodoParts";
 import { errorText } from "../format";
 import type { Nav } from "../router";
@@ -75,6 +76,7 @@ export function Todos({ family, nav }: { family: Family; nav: Nav }) {
       const c = await completeTodo(todo, all);
       clearTimeout(timer.current);
       setCompleted(c);
+      buzz(12);
       timer.current = setTimeout(() => setCompleted(null), UNDO_MS);
     });
   };
@@ -166,6 +168,7 @@ export function Todos({ family, nav }: { family: Family; nav: Nav }) {
 
       {completed && (
         <div className="undo-bar" role="status">
+          <DoneStamp key={completed.todo.id} />
           <p>「{completed.todo.title}」を済みにしました</p>
           <button className="btn btn--small" onClick={() => void undo(completed)} disabled={busy === completed.todo.id}>
             取り消す
