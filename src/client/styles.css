@@ -2505,50 +2505,119 @@ select {
 }
 
 /* ---- 完了の演出 ----
-   1件済ませたとき：「済」の判子が押される（少し大きく傾いて現れ、ぽんと縮んで止まる）。まわりに若竹のにじみ、札の枠が短く光る。
-   全部済んだとき：朱の大きな判子「皆済」と紙吹雪（canvas）。動かすのは transform と opacity だけ。
+   1件済ませたとき：「済」の判子が 1.6 倍ほどから傾いて落ちてきてドンと止まり、下の影がつぶれる。止まった瞬間に
+   まわりから小さな紙吹雪（canvas）と「＋1」、札の枠が短く光る。下に「○○ 完了！」の知らせ。見出しの数字が跳ね、棒に光が走る。
+   全部済んだとき：暗くした画面の生成りの紙に朱の花丸が筆の線で描かれ、描き終わりに判子「よくできました」。画面が小さく揺れ、
+   左右の下から紙吹雪（canvas）。動かすのは transform と opacity（花丸の線だけは stroke-dashoffset）。
    動きを減らす設定では上の「* { animation: none }」で止まる。演出オフでは動きのクラスを付けない */
+.done-stamp {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+.fuda .done-stamp {
+  grid-area: hanko;
+}
+.fuda--back .hanko--done {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-width: 3px;
+  background: var(--wakatake-tint);
+}
+.fuda--back .hanko--done b {
+  font-size: 1.5rem;
+}
 .hanko--done.is-stamping {
   position: relative;
-  /* 札が裏返って、裏の面が見えてきたところで押す */
-  animation: stamp-press 0.4s cubic-bezier(0.2, 0.8, 0.3, 1) 0.24s both;
+  z-index: 1;
+  /* 札が裏返って、裏の面が見えてきたところで押す。6割のところで札に当たる */
+  animation: stamp-press 0.45s 0.24s both;
 }
-.hanko--done.is-stamping::after {
-  /* にじむインクの輪 */
+.done-stamp.is-stamping::before {
+  /* 判子の下の影：近づくにつれて濃くなり、当たった瞬間に横へつぶれて消える */
   content: "";
   position: absolute;
-  inset: -0.5rem;
+  left: -0.375rem;
+  right: -0.375rem;
+  bottom: -0.375rem;
+  height: 0.875rem;
   border-radius: 50%;
-  background: radial-gradient(circle, transparent 48%, rgb(79 127 90 / 0.45) 58%, rgb(79 127 90 / 0.15) 66%, transparent 72%);
+  background: radial-gradient(closest-side, rgb(34 48 44 / 0.4), transparent);
   opacity: 0;
   pointer-events: none;
-  animation: ink-ring 0.6s ease-out 0.46s;
+  animation: stamp-shadow 0.55s ease-out 0.24s;
 }
 @keyframes stamp-press {
   0% {
     opacity: 0;
-    transform: scale(1.9) rotate(-22deg);
+    transform: translateY(-0.75rem) scale(1.6) rotate(-26deg);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
   }
-  55% {
+  15% {
     opacity: 1;
-    transform: scale(0.88) rotate(-7deg);
   }
-  78% {
-    transform: scale(1.06) rotate(-9.5deg);
+  60% {
+    transform: scale(0.88) rotate(-7deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  80% {
+    transform: scale(1.05) rotate(-9.5deg);
   }
   100% {
     opacity: 1;
     transform: scale(1) rotate(-9deg);
   }
 }
-@keyframes ink-ring {
+@keyframes stamp-shadow {
   0% {
-    opacity: 1;
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  52% {
+    opacity: 0.6;
     transform: scale(0.75);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.4, 0.55);
   }
   100% {
     opacity: 0;
-    transform: scale(1.7);
+    transform: scale(1.15, 0.8);
+  }
+}
+.plus-one {
+  /* 判子の上に「＋1」が浮かんで消える */
+  position: absolute;
+  left: 50%;
+  bottom: 85%;
+  z-index: 2;
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--wakatake);
+  text-shadow: 0 0 0.25rem #fff;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  animation: plus-one 0.8s ease-out 0.5s both;
+}
+@keyframes plus-one {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0.5rem) scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -0.25rem) scale(1.15);
+  }
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -1.5rem) scale(1);
   }
 }
 .is-stamped .fuda--back::after {
@@ -2562,10 +2631,63 @@ select {
     0 0 1rem 0.25rem rgb(79 127 90 / 0.5);
   opacity: 0;
   pointer-events: none;
-  animation: fuda-glow 0.8s ease-out 0.46s;
+  animation: fuda-glow 0.8s ease-out 0.5s;
 }
 @keyframes fuda-glow {
   20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 紙吹雪の canvas（1件のときは body に、全部済んだときは画面の中に） */
+.confetti {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* 済ませたときの知らせ「ゴミ出し 完了！」。下のタブの上に */
+.toast-area {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 1.25rem;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+@media (max-width: 40rem) {
+  .toast-area {
+    bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
+.toast {
+  margin: 0;
+  padding: 0.5rem 1.25rem;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 0.2);
+  animation: toast 1.5s ease-out both;
+}
+@keyframes toast {
+  0% {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+  12% {
+    opacity: 1;
+    transform: none;
+  }
+  85% {
     opacity: 1;
   }
   100% {
@@ -2583,11 +2705,9 @@ select {
 .undo-bar .hanko--done b {
   font-size: 1rem;
 }
-.undo-bar .hanko--done.is-stamping {
+.undo-bar .hanko--done.is-stamping,
+.undo-bar .done-stamp.is-stamping::before {
   animation-delay: 0s;
-}
-.undo-bar .hanko--done.is-stamping::after {
-  animation-delay: 0.22s;
 }
 
 /* 見出しの横の「今日 3/5」と細い棒 */
@@ -2608,21 +2728,28 @@ select {
   color: var(--wakatake);
 }
 .day-progress__num b.is-bumping {
-  animation: num-up 0.35s cubic-bezier(0.2, 0.8, 0.3, 1.3);
+  animation: num-hop 0.45s ease-out;
 }
-@keyframes num-up {
+@keyframes num-hop {
   0% {
     opacity: 0;
-    transform: translateY(0.6em);
+    transform: translateY(0.5em);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-0.45em) scale(1.35);
+  }
+  70% {
+    transform: translateY(0.05em) scale(0.95);
   }
   100% {
-    opacity: 1;
     transform: none;
   }
 }
 .day-progress__track {
+  position: relative;
   width: 4rem;
-  height: 0.25rem;
+  height: 0.3125rem;
   border-radius: 999px;
   background: var(--line);
   overflow: hidden;
@@ -2633,6 +2760,20 @@ select {
   background: var(--wakatake);
   transform-origin: left;
   transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.day-progress__shine {
+  /* 棒が伸びるところに光が走る */
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.9), transparent);
+  transform: translateX(-100%);
+  animation: bar-shine 0.7s ease-out 0.1s both;
+}
+@keyframes bar-shine {
+  to {
+    transform: translateX(260%);
+  }
 }
 
 /* サブタスク・買い物のチェック：丸に「✓」が押される */
@@ -2651,22 +2792,37 @@ select {
   }
 }
 
-/* 今日の画面：済ませたあとの静かな皆済 */
-.all-clear--kaisai {
+/* 小さな花丸（今日の画面の一言、人ごとの内訳）。小さくても見えるよう線を太く */
+.hanamaru-mark,
+.all-clear__mark {
+  flex: none;
+  color: var(--shu);
+}
+.hanamaru-mark {
+  display: inline-block;
+  width: 1.125em;
+  height: 1.125em;
+  margin: 0 0.125em 0 0.25em;
+  vertical-align: -0.2em;
+}
+.hanamaru-mark path {
+  stroke-width: 16;
+}
+.all-clear__mark {
+  width: 3rem;
+  height: 3rem;
+}
+.all-clear__mark path {
+  stroke-width: 10;
+}
+.all-clear--hanamaru {
   display: flex;
   align-items: center;
-  gap: 0.875rem;
-}
-.all-clear__seal {
-  flex: none;
-  width: 3.5rem;
-  height: 3.5rem;
-  color: var(--shu);
-  transform: rotate(-8deg);
+  gap: 0.75rem;
 }
 
-/* 皆済の画面：画面全体を少し暗くし、中央に生成りの紙と朱の判子 */
-.kaisai {
+/* ぜんぶ完了の画面：画面全体を暗くし、中央に生成りの紙と朱の花丸 */
+.hanamaru-dialog {
   margin: 0;
   padding: 1rem;
   border: 0;
@@ -2678,86 +2834,151 @@ select {
   color: var(--ink);
   overflow: hidden;
 }
-.kaisai[open] {
+.hanamaru-dialog[open] {
   display: grid;
   place-items: center;
 }
-.kaisai::backdrop {
-  background: rgb(34 48 44 / 0.55);
+.hanamaru-dialog::backdrop {
+  background: rgb(34 48 44 / 0.7);
 }
-.kaisai__body {
+.hanamaru-dialog__paper {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
-  width: min(22rem, 100%);
-  padding: 1.75rem 1.5rem 1.5rem;
+  width: min(23rem, 100%);
+  padding: 1.5rem 1.5rem 1.5rem;
   border-radius: 1rem;
   background: #f4efe4;
   text-align: center;
-  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 0.25);
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 0.3);
 }
-.kaisai__seal {
-  width: min(48vw, 11rem);
-  height: auto;
+.hanamaru {
+  position: relative;
+  width: min(66vw, 15rem);
+  aspect-ratio: 1;
+  margin-bottom: 0.5rem;
   color: var(--shu);
+}
+.hanamaru__draw {
   display: block;
-  transform: rotate(-8deg);
-}
-.kaisai__title {
-  font-size: var(--t-h2);
-  margin: 0;
-}
-.kaisai__count {
-  margin: 0 0 1rem;
-  color: var(--ink-soft);
-}
-.kaisai__who {
-  display: block;
-  color: var(--ink);
-  font-weight: 700;
-}
-.kaisai__close {
-  min-width: 10rem;
-}
-.kaisai__confetti {
-  position: fixed;
-  inset: 0;
   width: 100%;
   height: 100%;
-  z-index: 1;
-  pointer-events: none;
 }
-.kaisai.is-moving::backdrop {
+.hanamaru__seal {
+  /* 花丸のまんなかに押す */
+  position: absolute;
+  left: 31%;
+  top: 31%;
+  width: 38%;
+  height: 38%;
+  transform: rotate(-8deg);
+}
+.hanamaru-dialog__title {
+  margin: 0;
+  font-size: var(--t-h1);
+  font-weight: 900;
+  line-height: 1.4;
+}
+.hanamaru-dialog__count {
+  margin: 0.25rem 0 0;
+  color: var(--ink-soft);
+}
+.hanamaru-dialog__who {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-weight: 700;
+}
+.hanamaru-dialog__close {
+  margin-top: 1rem;
+  min-width: 10rem;
+}
+/* 動き：紙が出る → 0.15 秒から 0.9 秒かけて花丸を描く → 1.05 秒で判子がドン、画面が揺れる（紙吹雪も同時、Confetti） */
+.hanamaru-dialog.is-moving {
+  animation: screen-shake 0.3s linear 1.05s;
+}
+.hanamaru-dialog.is-moving::backdrop {
   animation: fade-in 0.25s ease-out;
 }
-.kaisai.is-moving .kaisai__body {
-  animation: fade-in 0.2s ease-out;
+.hanamaru-dialog.is-moving .hanamaru-dialog__paper {
+  animation: paper-in 0.25s ease-out both;
 }
-.kaisai.is-moving .kaisai__seal {
-  /* 上から押される：ちょっと大きく → ドンと止まる */
-  animation: kaisai-press 0.5s cubic-bezier(0.3, 0.7, 0.35, 1) both;
+.hanamaru-dialog.is-moving .hanamaru__draw .hanamaru__stroke {
+  /* 線の長さを 1 として、少しずつ見せる（遅れと長さは線ごとに HanamaruMark が決める） */
+  stroke-dasharray: 1 2;
+  animation-name: brush;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
 }
-.kaisai.is-moving .kaisai__title,
-.kaisai.is-moving .kaisai__count,
-.kaisai.is-moving .kaisai__close {
-  animation: fade-up 0.35s ease-out 0.4s both;
+.hanamaru-dialog.is-moving .hanamaru__seal {
+  animation: seal-press 0.3s 0.87s both;
 }
-@keyframes kaisai-press {
+.hanamaru-dialog.is-moving .hanamaru-dialog__title,
+.hanamaru-dialog.is-moving .hanamaru-dialog__count,
+.hanamaru-dialog.is-moving .hanamaru-dialog__who,
+.hanamaru-dialog.is-moving .hanamaru-dialog__close {
+  animation: fade-up 0.35s ease-out 1s both;
+}
+@keyframes brush {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  1% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+@keyframes seal-press {
   0% {
     opacity: 0;
-    transform: translateY(-3rem) scale(1.7) rotate(-16deg);
+    transform: scale(1.9) rotate(-22deg);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
+  }
+  20% {
+    opacity: 1;
   }
   60% {
-    opacity: 1;
-    transform: scale(0.92) rotate(-7deg);
+    transform: scale(0.9) rotate(-6deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
   }
   80% {
-    transform: scale(1.03) rotate(-8.5deg);
+    transform: scale(1.04) rotate(-9deg);
   }
   100% {
     opacity: 1;
     transform: rotate(-8deg);
+  }
+}
+@keyframes screen-shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translate(-6px, 4px);
+  }
+  40% {
+    transform: translate(5px, -4px);
+  }
+  60% {
+    transform: translate(-4px, 2px);
+  }
+  80% {
+    transform: translate(2px, -1px);
+  }
+}
+@keyframes paper-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
   }
 }
 @keyframes fade-in {
@@ -2770,7 +2991,4 @@ select {
     opacity: 0;
     transform: translateY(0.5rem);
   }
-}
-.kaisai__seal-wrap {
-  margin-bottom: 0.75rem;
 }

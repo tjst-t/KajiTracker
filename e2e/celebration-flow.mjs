@@ -1,5 +1,6 @@
-// 完了の演出：1件済ませると「済」の判子が押される動きと「今日 1/2」、全部済むと「皆済」の画面と紙吹雪（1日1回）。
-// 動きを減らす設定（reduced motion）と、設定の「完了の演出」オフでは静かになる。
+// 完了の演出：1件済ませると大きな「済」の判子・小さな紙吹雪・「＋1」・知らせ「ゴミ出し 完了！」と「今日 1/2」、
+// 全部済むと花丸が描かれて判子「よくできました」・左右からの紙吹雪・「今日の当番、ぜんぶ完了！」（1日1回）。
+// 動きを減らす設定（reduced motion）と、設定の「完了の演出」オフでは canvas も動きも出さない。
 // 開発サーバを起こしてから `npm run e2e`（todos-flow のあとに流れる）。
 import { execSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
@@ -58,7 +59,17 @@ async function headingHas(page, text) {
   });
 }
 const fuda = (page, name) => page.locator(".fuda-wrap", { hasText: name });
-const kaisai = (page) => page.getByRole("dialog", { name: "今日の当番、ぜんぶ済みました" });
+const allDone = (page) => page.getByRole("dialog", { name: "今日の当番、ぜんぶ完了！" });
+const toast = (page) => page.getByRole("status").filter({ hasText: "完了！" });
+/** 「皆済」という文字がどこにも無いか */
+async function noKaisai(page, where) {
+  if (await page.evaluate(() => document.documentElement.outerHTML.includes("皆済"))) throw new Error(`${where}: 「皆済」が出ている`);
+}
+/** 動きを止めているとき：canvas・＋1・揺れ・花丸を描く動きが無い */
+async function quiet(page, where) {
+  if ((await page.locator("canvas").count()) !== 0) throw new Error(`${where}: 紙吹雪の canvas が出た`);
+  if ((await page.locator(".plus-one, .is-stamping, .is-stamped, .is-bumping, .day-progress__shine").count()) !== 0) throw new Error(`${where}: 判子・＋1・跳ねが動いた`);
+}
 
 try {
   step = "setup";
@@ -76,41 +87,70 @@ try {
   await headingHas(page, "今日 0/2");
   ok("今日が期限の家事を2件。見出しの横に「今日 0/2」");
 
-  // ---- 1件目：判子が押される動き・進み具合 ----
+  // ---- 1件目：大きな判子・小さな紙吹雪・＋1・知らせ・進み具合 ----
   step = "first";
   await fuda(page, "ゴミ出し").getByRole("button", { name: "やった" }).click();
   const stamp = fuda(page, "ゴミ出し").locator(".hanko--done.is-stamping");
   await stamp.waitFor();
+  const stampedAt = Date.now();
   if (!(await fuda(page, "ゴミ出し").evaluate((el) => el.classList.contains("is-stamped")))) throw new Error("札の枠が光るクラスが無い");
-  await page.waitForTimeout(480);
+  const burst = page.locator("canvas.confetti--burst");
+  await burst.waitFor({ state: "attached", timeout: 1000 });
+  if ((await burst.getAttribute("aria-hidden")) !== "true") throw new Error("紙吹雪の canvas に aria-hidden が無い");
+  const plus = fuda(page, "ゴミ出し").locator(".plus-one");
+  if ((await plus.textContent()) !== "＋1") throw new Error(`「＋1」が無い: ${await plus.textContent()}`);
+  await toast(page).getByText("ゴミ出し 完了！").waitFor({ timeout: 1000 });
+  if ((await toast(page).getByRole("button").count()) !== 0) throw new Error("知らせにボタンがある");
+  await page.waitForTimeout(Math.max(0, 560 - (Date.now() - stampedAt)));
   await page.screenshot({ path: `${SHOTS}/70-stamp.png` });
+  await page.waitForTimeout(180);
+  await page.screenshot({ path: `${SHOTS}/71-stamp-confetti.png` });
   await headingHas(page, "今日 1/2");
-  if ((await kaisai(page).count()) !== 0) throw new Error("1件目で皆済が出た");
-  ok("1件目の「やった」で「済」の判子が押される動き（is-stamping）、見出しが「今日 1/2」");
+  if ((await page.locator(".day-progress__num b.is-bumping").count()) !== 1) throw new Error("数字が跳ねない");
+  if ((await page.locator(".day-progress__shine").count()) !== 1) throw new Error("棒に光が走らない");
+  if ((await allDone(page).count()) !== 0) throw new Error("1件目でぜんぶ完了が出た");
+  await burst.waitFor({ state: "detached", timeout: 2500 });
+  const burstMs = Date.now() - stampedAt;
+  if (burstMs > 2200) throw new Error(`小さな紙吹雪が長い: ${burstMs}ms`);
+  await toast(page).getByText("ゴミ出し 完了！").waitFor({ state: "detached", timeout: 2500 });
+  await noKaisai(page, "1件目");
+  ok(`1件目で判子が押され、小さな紙吹雪（${burstMs}ms で消える）・「＋1」・知らせ「ゴミ出し 完了！」、見出しが「今日 1/2」で跳ねる`);
 
-  // ---- 2件目：皆済の画面と紙吹雪 ----
-  step = "kaisai";
+  // ---- 2件目：花丸と「よくできました」、左右からの紙吹雪 ----
+  step = "all-done";
   await fuda(page, "洗濯").getByRole("button", { name: "やった" }).click();
-  await kaisai(page).waitFor();
+  await allDone(page).waitFor();
   const opened = Date.now();
-  const canvas = page.locator("canvas.kaisai__confetti");
-  await canvas.waitFor({ state: "attached", timeout: 1000 });
-  if ((await canvas.getAttribute("aria-hidden")) !== "true") throw new Error("紙吹雪の canvas に aria-hidden が無い");
-  if ((await kaisai(page).getAttribute("aria-modal")) !== "true") throw new Error("皆済の画面に aria-modal が無い");
-  await page.waitForTimeout(550);
-  await page.screenshot({ path: `${SHOTS}/71-kaisai.png` });
+  const cannons = page.locator("canvas.confetti--cannons");
+  await cannons.waitFor({ state: "attached", timeout: 1000 });
+  if ((await cannons.getAttribute("aria-hidden")) !== "true") throw new Error("紙吹雪の canvas に aria-hidden が無い");
+  if ((await allDone(page).getAttribute("aria-modal")) !== "true") throw new Error("ぜんぶ完了の画面に aria-modal が無い");
+  if (!(await allDone(page).evaluate((el) => el.classList.contains("is-moving")))) throw new Error("ぜんぶ完了の画面が動いていない");
+  const strokes = allDone(page).locator(".hanamaru__draw path");
+  if ((await strokes.count()) < 8) throw new Error("花丸の線が無い");
+  const dash = await strokes.first().evaluate((el) => getComputedStyle(el).strokeDasharray);
+  if (dash === "none") throw new Error("花丸が筆で描かれていない（stroke-dasharray が無い）");
+  const seal = await allDone(page).locator(".hanamaru__seal").textContent();
+  if (seal?.replace(/\s/g, "") !== "よくできました") throw new Error(`判子が「よくできました」でない: ${seal}`);
+  await page.waitForTimeout(Math.max(0, 600 - (Date.now() - opened)));
+  await page.screenshot({ path: `${SHOTS}/72-hanamaru-drawing.png` });
+  await page.waitForTimeout(Math.max(0, 1180 - (Date.now() - opened)));
+  await page.screenshot({ path: `${SHOTS}/73-hanamaru-stamp.png` });
   if (!(await page.evaluate(() => document.activeElement?.textContent === "閉じる"))) throw new Error("閉じるにフォーカスが無い");
-  await kaisai(page).getByText("今日済ませたのは 2件").waitFor();
-  await kaisai(page).getByText("たくみ 2").waitFor();
-  await canvas.waitFor({ state: "detached", timeout: 4000 });
+  await allDone(page).getByText("今日済ませたのは2件").waitFor();
+  await allDone(page).getByRole("listitem", { name: "たくみ 2件" }).locator(".hanamaru-mark").waitFor();
+  await page.waitForTimeout(Math.max(0, 2200 - (Date.now() - opened)));
+  await page.screenshot({ path: `${SHOTS}/74-hanamaru-confetti.png` });
+  await cannons.waitFor({ state: "detached", timeout: 7000 });
   const took = Date.now() - opened;
-  if (took < 1500 || took > 3500) throw new Error(`紙吹雪の長さがおかしい: ${took}ms`);
-  await page.waitForTimeout(1200);
-  if (!(await kaisai(page).isVisible())) throw new Error("皆済の画面が自動で閉じた");
-  await page.screenshot({ path: `${SHOTS}/72-kaisai-after.png` });
-  await kaisai(page).getByRole("button", { name: "閉じる" }).click();
-  await kaisai(page).waitFor({ state: "hidden" });
-  ok(`2件目で「皆済」の画面（dialog・閉じるにフォーカス）、紙吹雪は ${took}ms で消え、内訳「たくみ 2」。閉じるで閉じる`);
+  if (took < 3500 || took > 5800) throw new Error(`紙吹雪の長さがおかしい: ${took}ms`);
+  await page.waitForTimeout(800);
+  if (!(await allDone(page).isVisible())) throw new Error("ぜんぶ完了の画面が自動で閉じた");
+  await page.screenshot({ path: `${SHOTS}/75-hanamaru-after.png` });
+  await noKaisai(page, "ぜんぶ完了");
+  await allDone(page).getByRole("button", { name: "閉じる" }).click();
+  await allDone(page).waitFor({ state: "hidden" });
+  ok(`2件目で花丸と判子「よくできました」・「今日の当番、ぜんぶ完了！」（dialog・閉じるにフォーカス）、内訳「たくみ ✿2」、左右の紙吹雪は ${took}ms で消える`);
 
   // ---- 取り消して済ませ直しても、2回目は出ない ----
   step = "again";
@@ -119,33 +159,35 @@ try {
   await fuda(page, "洗濯").getByRole("button", { name: "やった" }).click();
   await headingHas(page, "今日 2/2");
   await page.waitForTimeout(1000);
-  if ((await kaisai(page).count()) !== 0) throw new Error("同じ日に皆済が2回出た");
-  ok("取り消して済ませ直しても、同じ日には皆済を出さない");
+  if ((await allDone(page).count()) !== 0) throw new Error("同じ日にぜんぶ完了が2回出た");
+  ok("取り消して済ませ直しても、同じ日にはぜんぶ完了を出さない");
 
-  // ---- 並べ直したあと、「やること」に静かな皆済 ----
+  // ---- 並べ直したあと、「やること」に静かな花丸 ----
   step = "quiet";
-  await page.locator(".all-clear--kaisai", { hasText: "今日の当番は、ぜんぶ済みました" }).waitFor({ timeout: 10000 });
-  await page.locator(".all-clear__seal").waitFor();
-  await page.screenshot({ path: `${SHOTS}/73-quiet-kaisai.png` });
-  ok("6秒たって並べ直すと、「やること」に小さな皆済の判子と一言");
+  await page.locator(".all-clear--hanamaru", { hasText: "今日はぜんぶ完了" }).waitFor({ timeout: 10000 });
+  await page.locator(".all-clear__mark").waitFor();
+  await noKaisai(page, "静かな花丸");
+  await page.screenshot({ path: `${SHOTS}/76-quiet-hanamaru.png` });
+  ok("6秒たって並べ直すと、「やること」に小さな花丸と「今日はぜんぶ完了」");
 
-  // ---- 動きを減らす設定：紙吹雪・動きなし。判子と文は出る。Esc で閉じる ----
+  // ---- 動きを減らす設定：canvas・揺れ・＋1・跳ねなし。花丸と判子は描き終わった形で、知らせは出る。Esc で閉じる ----
   step = "reduced";
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.evaluate(() => localStorage.removeItem("kaji.kaisai"));
+  await page.evaluate(() => localStorage.removeItem("kaji.allDone"));
   await addTodayChore(page, "風呂掃除");
   await openToday(page);
   await fuda(page, "風呂掃除").getByRole("button", { name: "やった" }).click();
-  await kaisai(page).waitFor();
+  await allDone(page).waitFor();
+  await toast(page).getByText("風呂掃除 完了！").waitFor({ timeout: 1000 });
   await page.waitForTimeout(400);
-  if ((await page.locator("canvas").count()) !== 0) throw new Error("動きを減らす設定で紙吹雪が出た");
-  if ((await fuda(page, "風呂掃除").locator(".is-stamping").count()) !== 0) throw new Error("動きを減らす設定で判子が動いた");
-  if (await kaisai(page).evaluate((el) => el.classList.contains("is-moving"))) throw new Error("動きを減らす設定で皆済が動いた");
-  await kaisai(page).getByText("今日済ませたのは 3件").waitFor();
-  await page.screenshot({ path: `${SHOTS}/74-kaisai-reduced.png` });
+  await quiet(page, "reduced motion");
+  if (await allDone(page).evaluate((el) => el.classList.contains("is-moving"))) throw new Error("動きを減らす設定でぜんぶ完了が動いた");
+  if ((await strokes.first().evaluate((el) => getComputedStyle(el).strokeDasharray)) !== "none") throw new Error("動きを減らす設定で花丸を描く動きがある");
+  await allDone(page).getByText("今日済ませたのは3件").waitFor();
+  await page.screenshot({ path: `${SHOTS}/77-hanamaru-reduced.png` });
   await page.keyboard.press("Escape");
-  await kaisai(page).waitFor({ state: "hidden" });
-  ok("reduced motion：皆済の判子と文は出るが、紙吹雪・判子の動きは無い。Esc で閉じる");
+  await allDone(page).waitFor({ state: "hidden" });
+  ok("reduced motion：花丸と判子は描き終わった形で、知らせ「風呂掃除 完了！」は出る。canvas・＋1・跳ねは無い。Esc で閉じる");
 
   // ---- 設定で「完了の演出」をオフ ----
   step = "setting-off";
@@ -155,13 +197,18 @@ try {
   const toggle = page.getByLabel("完了の演出");
   if (!(await toggle.isChecked())) throw new Error("完了の演出が初めからオンでない");
   await toggle.uncheck();
+  await page.evaluate(() => localStorage.removeItem("kaji.allDone"));
   await addTodayChore(page, "皿洗い");
   await openToday(page);
   await fuda(page, "皿洗い").getByRole("button", { name: "やった" }).click();
   await fuda(page, "皿洗い").locator(".hanko--done").waitFor();
-  if ((await fuda(page, "皿洗い").locator(".is-stamping").count()) !== 0) throw new Error("演出オフで判子が動いた");
-  if (await fuda(page, "皿洗い").evaluate((el) => el.classList.contains("is-stamped"))) throw new Error("演出オフで札が光った");
-  ok("設定で「完了の演出」をオフにすると、判子の動きのクラスが付かない");
+  await toast(page).getByText("皿洗い 完了！").waitFor({ timeout: 1000 });
+  await allDone(page).waitFor();
+  await page.waitForTimeout(400);
+  await quiet(page, "演出オフ");
+  if (await allDone(page).evaluate((el) => el.classList.contains("is-moving"))) throw new Error("演出オフでぜんぶ完了が動いた");
+  await allDone(page).getByRole("button", { name: "閉じる" }).click();
+  ok("設定で「完了の演出」をオフにすると、canvas・判子の動き・＋1 が無く、知らせと花丸は出る");
 
   // 設定を戻しておく（同じ端末で別の流れを試すときのため）
   await page.goto(`${ORIGIN}/settings`);

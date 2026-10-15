@@ -2,17 +2,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { addDays, diffDays, toDayNum, weekdayOf } from "../../shared/date";
 import { WEEKDAYS, shortDate } from "../../shared/describe";
 import { type Family, type Me, api } from "../api";
-import { breakdownText, buzz, kaisaiShown, markKaisai, useMotion } from "../celebrate";
+import { allDoneShown, breakdown, buzz, markAllDone, useMotion } from "../celebrate";
 import type { ChoreView, LogView } from "../chores";
 import { Fuda, TodoFuda, lastText } from "../components/Fuda";
 import { HowtoDialog } from "../components/Howto";
-import { KaisaiDialog, KaisaiSeal } from "../components/Kaisai";
+import { HanamaruDialog, HanamaruMark } from "../components/Hanamaru";
 import { Progress, useAskDone } from "../components/TodoParts";
 import { errorText } from "../format";
 import type { Nav } from "../router";
 import { type Completed, type TodoView, completeTodo, dateOfIso, undoComplete } from "../todos";
 
 const UNDO_MS = 6000;
+/** 下の知らせ「ゴミ出し 完了！」を出しておく長さ */
+const TOAST_MS = 1500;
 
 function longDate(d: string) {
   const [, m, day] = d.split("-").map(Number);
@@ -56,8 +58,11 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
   const [error, setError] = useState<string | null>(null);
   const [howto, setHowto] = useState<ChoreView | null>(null);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  /** 皆済の画面（出ているあいだの件数と内訳） */
-  const [kaisai, setKaisai] = useState<{ total: number; breakdown: string } | null>(null);
+  /** ぜんぶ完了の花丸の画面（出ているあいだの件数と内訳） */
+  const [allDone, setAllDone] = useState<{ total: number; who: [string, number][] } | null>(null);
+  /** 下の知らせ「○○ 完了！」（key は同じ文が続いたときも出し直すため） */
+  const [toast, setToast] = useState<{ key: number; text: string } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   /** いま済ませたばかりで、全部済んだか確かめる */
   const justDone = useRef(false);
   const { ask, dialog } = useAskDone();
@@ -67,7 +72,7 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
       const [c, t, d] = await Promise.all([
         api<{ today: string; chores: ChoreView[] }>("GET", `/families/${family.id}/chores`),
         api<{ today: string; todos: TodoView[] }>("GET", `/families/${family.id}/todos?status=open`),
-        // 今日済ませた TODO（進み具合と皆済の内訳に）。済ませた新しい順なので、多めに引けば今日の分は入る
+        // 今日済ませた TODO（進み具合とぜんぶ完了の内訳に）。済ませた新しい順なので、多めに引けば今日の分は入る
         api<{ today: string; todos: TodoView[] }>("GET", `/families/${family.id}/todos?status=done&limit=100`),
       ]);
       setData({ ...c, todos: t.todos, doneTodos: d.todos.filter((x) => x.doneAt && dateOfIso(x.doneAt) === c.today) });
@@ -84,16 +89,29 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
     void load();
   }, [load]);
 
-  useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), []);
+  useEffect(
+    () => () => {
+      Object.values(timers.current).forEach(clearTimeout);
+      clearTimeout(toastTimer.current);
+    },
+    [],
+  );
+
+  /** 済ませたときの知らせ。取り消しは札にあるので、知らせは文だけ */
+  const announce = (name: string) => {
+    clearTimeout(toastTimer.current);
+    setToast((t) => ({ key: (t?.key ?? 0) + 1, text: `${name} 完了！` }));
+    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
+  };
 
   const count = data ? tally(data, done, todoDone) : null;
-  // 最後の1件を済ませた瞬間に皆済（札が裏返ってすぐ。Family ごとに1日1回）
+  // 最後の1件を済ませた瞬間に花丸（札が裏返ってすぐ。Family ごとに1日1回）
   useEffect(() => {
     if (!justDone.current || !data || !count) return;
     justDone.current = false;
-    if (count.left > 0 || count.total === 0 || kaisaiShown(family.id, data.today)) return;
-    markKaisai(family.id, data.today);
-    setKaisai({ total: count.done, breakdown: breakdownText(count.names.filter(Boolean)) });
+    if (count.left > 0 || count.total === 0 || allDoneShown(family.id, data.today)) return;
+    markAllDone(family.id, data.today);
+    setAllDone({ total: count.done, who: breakdown(count.names.filter(Boolean)) });
   });
 
   const finish = (id: string) => {
@@ -110,6 +128,7 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
       const r = await api<{ log: LogView }>("POST", `/chores/${chore.id}/logs`);
       setDone((d) => ({ ...d, [chore.id]: r.log }));
       buzz(12);
+      announce(chore.name);
       justDone.current = true;
       // 少しのあいだ裏返したまま取り消せるようにし、そのあと並べ直す
       timers.current[chore.id] = setTimeout(async () => {
@@ -147,6 +166,7 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
       const c = await completeTodo(todo, all);
       setTodoDone((d) => ({ ...d, [todo.id]: c }));
       buzz(12);
+      announce(todo.title);
       justDone.current = true;
       timers.current[todo.id] = setTimeout(async () => {
         await load();
@@ -207,8 +227,8 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
   const later = rest.filter((i) => !soon.includes(i) && i.kind === "chore");
 
   const next = rest[0];
-  // 今日なにか済ませて、やることが残っていなければ、小さな皆済の判子を静かに
-  const kaisaiQuiet = !!count && count.done > 0;
+  // 今日なにか済ませて、やることが残っていなければ、小さな花丸を静かに
+  const quietDone = !!count && count.done > 0;
   const dueSection = (
     <section aria-labelledby="t-due">
       <h2 id="t-due" className="today__section">
@@ -216,10 +236,10 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
         {count && count.total > 0 && <DayProgress done={count.done} total={count.total} />}
       </h2>
       {due.length === 0 ? (
-        <p className={`all-clear${kaisaiQuiet ? " all-clear--kaisai" : ""}`}>
-          {kaisaiQuiet && <KaisaiSeal className="all-clear__seal" />}
+        <p className={`all-clear${quietDone ? " all-clear--hanamaru" : ""}`}>
+          {quietDone && <HanamaruMark className="all-clear__mark" />}
           <span>
-            {kaisaiQuiet ? "今日の当番は、ぜんぶ済みました。" : "今日やることは、ぜんぶ済んでいます。"}
+            {quietDone ? "今日はぜんぶ完了。" : "今日やることは、ぜんぶ済んでいます。"}
             {next && dueOfItem(next).dueOn && (
               <>
                 次は {shortDate(dueOfItem(next).dueOn!)} の「{itemName(next)}」です。
@@ -308,7 +328,14 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
         </section>
       )}
       {howto && <HowtoDialog chore={howto} onClose={() => setHowto(null)} />}
-      {kaisai && <KaisaiDialog total={kaisai.total} breakdown={kaisai.breakdown} onClose={() => setKaisai(null)} />}
+      {allDone && <HanamaruDialog total={allDone.total} who={allDone.who} onClose={() => setAllDone(null)} />}
+      <div className="toast-area" role="status">
+        {toast && (
+          <p key={toast.key} className="toast">
+            {toast.text}
+          </p>
+        )}
+      </div>
       {dialog}
       {me.passkeyCount === 0 && (
         <p className="notice">あなたのアカウントには、まだパスキーがありません。「設定」でパスキーを作っておくと、次からすぐにログインできます。</p>
@@ -317,7 +344,7 @@ export function Today({ me, family, nav }: { me: Me; family: Family; nav: Nav })
   );
 }
 
-/** 見出しの横の「今日 3/5」と細い棒。済んだ数が増えたら、数字が1つ上がる動き */
+/** 見出しの横の「今日 3/5」と細い棒。済んだ数が増えたら、数字が少し跳ね、棒が伸びるところに光が走る */
 function DayProgress({ done, total }: { done: number; total: number }) {
   const motion = useMotion();
   const prev = useRef(done);
@@ -337,6 +364,7 @@ function DayProgress({ done, total }: { done: number; total: number }) {
       </span>
       <span className="day-progress__track" aria-hidden="true">
         <span className="day-progress__bar" style={{ transform: `scaleX(${done / total})` }} />
+        {bump > 0 && motion && <span key={bump} className="day-progress__shine" />}
       </span>
     </span>
   );

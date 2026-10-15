@@ -243,7 +243,7 @@ function CreatePasskeyDialog({ onCreated, onClose }: { onCreated: () => void; on
 }
 
 /** この端末で通知を受けるかのオン・オフ。いまの状態（許可済み・拒否・未対応）に合わせて出し分ける */
-/** 完了の演出（判子の動き・紙吹雪・振動）。この端末だけの設定 */
+/** 完了の演出（判子の動き・紙吹雪・画面の揺れ・振動）。この端末だけの設定 */
 function CelebrationToggle() {
   const [on, set] = useCelebrationSetting();
   return (
@@ -252,7 +252,7 @@ function CelebrationToggle() {
         <input type="checkbox" checked={on} onChange={(e) => set(e.target.checked)} />
         完了の演出
       </label>
-      <p className="muted">済ませたときの判子の動き・紙吹雪・振動。この端末だけの設定です。オフにすると、判子は動かずに出ます。</p>
+      <p className="muted">済ませたときの判子の動き・紙吹雪・画面の揺れ・振動。この端末だけの設定です。オフにすると、判子と花丸は動かずに出ます。</p>
     </div>
   );
 }

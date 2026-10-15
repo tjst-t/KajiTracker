@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { diffDays } from "../../shared/date";
 import { shortDate } from "../../shared/describe";
 import type { ChoreView, LogView } from "../chores";
 import { useMotion } from "../celebrate";
 import { type TodoView, dateOfIso, dueOf } from "../todos";
+import { Confetti } from "./Confetti";
 import { Progress } from "./TodoParts";
 
 /** 期限から見た状態（家事は status、TODO は dueStatus を status に入れて渡す） */
@@ -28,15 +30,30 @@ export function Hanko({ chore, today }: { chore: Due; today: string }) {
   return null;
 }
 
+/** 判子が札に当たる瞬間（裏返りはじめてから。CSS の stamp-press の遅れ＋6割） */
+const STAMP_IMPACT_MS = 510;
+
 /**
- * 済ませた印「済」。動かしてよいときは、少し大きく傾いて現れ、ぽんと縮んで止まる（押される動き）。
- * まわりに若竹のインクのにじみが1回広がる。札の裏では、札の枠も短く光る（.is-stamped）
+ * 済ませた印「済」。動かしてよいときは、1.6 倍ほどから傾いて落ちてきてドンと止まり、下の影がつぶれる。
+ * 札の裏では（pop）、止まった瞬間に判子のまわりから小さな紙吹雪がはじけ、上に「＋1」が浮かぶ。札の枠も短く光る（.is-stamped）
  */
-export function DoneStamp() {
+export function DoneStamp({ pop = false }: { pop?: boolean }) {
   const motion = useMotion();
+  const ref = useRef<HTMLSpanElement>(null);
+  // 出たときに決める（あとで設定が変わっても、出ている紙吹雪は変えない）
+  const [confetti, setConfetti] = useState(() => pop && motion);
+  const at = () => {
+    const box = ref.current?.getBoundingClientRect();
+    return box?.width ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : null;
+  };
   return (
-    <span className={`hanko hanko--done${motion ? " is-stamping" : ""}`} aria-hidden="true">
-      <b>済</b>
+    <span ref={ref} className={`done-stamp${motion ? " is-stamping" : ""}`} aria-hidden="true">
+      <span className={`hanko hanko--done${motion ? " is-stamping" : ""}`}>
+        <b>済</b>
+      </span>
+      {pop && motion && <span className="plus-one">＋1</span>}
+      {/* 札は 3D で裏返っているので、紙吹雪は body に出す（札の中では fixed が効かない） */}
+      {confetti && createPortal(<Confetti kind="burst" delay={STAMP_IMPACT_MS} at={at} onEnd={() => setConfetti(false)} />, document.body)}
     </span>
   );
 }
@@ -102,7 +119,7 @@ export function Fuda(props: {
         <article className="fuda fuda--back" aria-hidden={!done} aria-live="polite">
           {done && (
             <>
-              <DoneStamp />
+              <DoneStamp pop />
               <div className="fuda__body">
                 <p className="fuda__name">{chore.name}</p>
                 <p className="fuda__meta">
@@ -174,7 +191,7 @@ export function TodoFuda(props: {
         <article className="fuda fuda--back" aria-hidden={!done} aria-live="polite">
           {done && (
             <>
-              <DoneStamp />
+              <DoneStamp pop />
               <div className="fuda__body">
                 <p className="fuda__name">{todo.title}</p>
                 <p className="fuda__meta">

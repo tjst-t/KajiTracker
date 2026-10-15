@@ -1,8 +1,8 @@
-// 完了の演出の決まり：端末ごとのオン・オフ、動きを減らす設定、振動、皆済を出したかどうか（Family ごとに1日1回）
+// 完了の演出の決まり：端末ごとのオン・オフ、動きを減らす設定、振動、花丸を出したかどうか（Family ごとに1日1回）
 import { useSyncExternalStore } from "react";
 
 const SETTING_KEY = "kaji.celebrate";
-const KAISAI_KEY = "kaji.kaisai";
+const ALL_DONE_KEY = "kaji.allDone";
 const listeners = new Set<() => void>();
 
 /** 設定の「完了の演出」（端末ごと、初期はオン） */
@@ -69,31 +69,28 @@ export function popCheck(el: HTMLElement) {
   window.setTimeout(() => el.classList.remove("is-popping"), 400);
 }
 
-function kaisaiRecord(): Record<string, string> {
+function allDoneRecord(): Record<string, string> {
   try {
-    return JSON.parse(localStorage.getItem(KAISAI_KEY) ?? "{}") as Record<string, string>;
+    return JSON.parse(localStorage.getItem(ALL_DONE_KEY) ?? "{}") as Record<string, string>;
   } catch {
     return {};
   }
 }
 
-/** その日、その Family で皆済をもう出したか */
-export const kaisaiShown = (familyId: string, today: string) => kaisaiRecord()[familyId] === today;
+/** その日、その Family で「ぜんぶ完了」の花丸をもう出したか */
+export const allDoneShown = (familyId: string, today: string) => allDoneRecord()[familyId] === today;
 
-export function markKaisai(familyId: string, today: string) {
+export function markAllDone(familyId: string, today: string) {
   try {
-    localStorage.setItem(KAISAI_KEY, JSON.stringify({ ...kaisaiRecord(), [familyId]: today }));
+    localStorage.setItem(ALL_DONE_KEY, JSON.stringify({ ...allDoneRecord(), [familyId]: today }));
   } catch {
     // 保存できなければ、次に全部済んだときにまた出る
   }
 }
 
-/** 人ごとの内訳「たくみ 3・はなこ 2」（多い順、同じなら名前順） */
-export function breakdownText(names: string[]): string {
+/** 人ごとの件数 [["たくみ", 3], ["はなこ", 2]]（多い順、同じなら名前順） */
+export function breakdown(names: string[]): [string, number][] {
   const counts = new Map<string, number>();
   for (const n of names) counts.set(n, (counts.get(n) ?? 0) + 1);
-  return [...counts]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"))
-    .map(([n, c]) => `${n} ${c}`)
-    .join("・");
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"));
 }
